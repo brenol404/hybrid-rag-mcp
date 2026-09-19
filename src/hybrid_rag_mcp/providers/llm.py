@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import time
+
+from ..config import Settings
+from .base import LLMProvider, LLMResponse
+
+
+class OllamaLLM(LLMProvider):
+    provider_name = "ollama"
+
+    def __init__(self, settings: Settings) -> None:
+        import ollama
+
+        self._client = ollama.Client(host=settings.ollama_host)
+        self._model = settings.llm_model
+
+    def complete(self, system: str, user: str) -> LLMResponse:
+        resp = self._client.chat(
+            model=self._model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        )
+        return LLMResponse(
+            text=resp["message"]["content"], provider=self.provider_name, model=self._model
+        )
+
+
+class CloudLLM(LLMProvider):
+    """Cliente OpenAI-compatible (OpenAI, Anthropic via gateway, Together, Groq...)."""
+
+    provider_name = "cloud"
+
+    def __init__(self, settings: Settings) -> None:
+        import httpx
+
+        self._base_url = settings.cloud_base_url.rstrip("/")
+        self._api_key = settings.cloud_api_key
+        self._model = settings.cloud_model
+        self._http = httpx.Client(timeout=60)
+
+    def complete(self, system: str, user: str) -> LLMResponse:
+        resp = self._http.post(
+            f"{self._base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self._api_key}"},
+            json={
+                "model": self._model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            },
+        )
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"]
+        return LLMResponse(text=text, provider=self.provider_name, model=self._model)
+
+
+class FallbackLLM:
+    """Tenta o provedor de nuvem e cai automaticamente para Ollama local."""
+
+    def __init__(self, settings: Settings) -> None:
+        providers: list[LLMProvider] = [OllamaLLM(settings)]
+        if settings.cloud_api_key and settings.cloud_base_url:
+            providers.insert(0, CloudLLM(settings))
+        self._providers = providers
+
+    @property
+    def has_cloud(self) -> bool:
+        return len(self._providers) > 1 and self._providers[0].provider_name == "cloud"
+
+    def complete(self, system: str, user: str) -> LLMResponse:
+        errors: list[str] = []
+        for provider in self._providers:
+            try:
+                return provider.complete(system, user)
+            except Exception as exc:  # noqa: BLE001 - fallback deve capturar qualquer falha de provedor
+                errors.append(f"{provider.provider_name}: {exc}")
+                time.sleep(0.2)
+        raise RuntimeError(f"Todos os provedores de LLM falharam: {'; '.join(errors)}")

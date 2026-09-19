@@ -1,0 +1,21 @@
+# Guia de Segurança do Servidor Pqpbr
+
+## Autenticação
+Toda requisição ao servidor Pqpbr deve incluir um token JWT de curta duração.
+Os tokens expiram em 10 minutos e são emitidos pelo serviço de identidade interno.
+Nunca armazene tokens em variáveis de ambiente de forma persistente; use um
+cofre de segredos como Vault ou o gerenciador de segredos da nuvem.
+
+## Controle de Acesso
+O acesso é segmentado por função do usuário. O papel "operador" pode apenas
+leitura de telemetria; o papel "admin" tem permissão de escrita e reconfiguração.
+Princípio do menor privilégio é obrigatório.
+
+## Proteção contra Cost Exhaustion
+Em 2026, ataques de cost exhaustion tornaram-se o vetor mais explorado contra
+APIs de IA. O gateway de inferência aplica rate limiting por comprador e por
+aplicação, com limite de orçamento diário monitorado em tempo real.
+
+## Auditoria
+Toda ação administrativa é registrada em log imutável. Os registros de auditoria
+são retidos por 6 meses conforme política de conformidade.

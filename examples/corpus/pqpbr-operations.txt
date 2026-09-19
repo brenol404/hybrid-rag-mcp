@@ -1,0 +1,21 @@
+# Manual de Operação do Servidor Pqpbr
+
+## Visão Geral
+O servidor Pqpbr é uma infraestrutura de dados distribuída responsável pelo
+processamento de telemetria em tempo real. Ele ingere mais de 50 mil eventos
+por segundo de sensores IoT em data centers.
+
+## Configuração de Rede
+O servidor escuta na porta 8443 por padrão. Para ambientes de produção,
+recomenda-se uso de TLS mútuo e balanceamento de carga com múltiplas réplicas.
+A configuração de rede fica no arquivo /etc/pqpbr/config.toml.
+
+## Alta Disponibilidade
+Utilizamos replicação síncrona com quorum de três nós. Se um nó primário falhar,
+a eleição de um novo primário acontece em menos de 300 milissegundos.
+O failover automático é monitorado pelo agente de observabilidade.
+
+## Manutenção
+Backups incrementais são executados a cada 4 horas. A janela de manutenção recomendada
+é entre 02h e 04h, horário de Brasília. Sempre execute o script de verificação
+de integridade antes de restaurar qualquer snapshot.

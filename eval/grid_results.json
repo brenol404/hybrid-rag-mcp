@@ -1,0 +1,245 @@
+[
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 10,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.917,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 20,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.917,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 10,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.917,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 20,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.917,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 10,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.917,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 20,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.917,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 50,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.861,
+    "recall@3": 0.972,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 50,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.861,
+    "recall@3": 0.972,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 50,
+    "w_vec": 1.0,
+    "w_lex": 1.5,
+    "recall@1": 0.861,
+    "recall@3": 0.972,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 10,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 10,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 20,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.972,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 20,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 50,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.944,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 30,
+    "bm25_top_k": 50,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 10,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 10,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 20,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.972,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 20,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 50,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.944,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 60,
+    "bm25_top_k": 50,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 10,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 1.0,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 10,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 20,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.972,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 20,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 50,
+    "w_vec": 1.0,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.944,
+    "recall@5": 1.0
+  },
+  {
+    "rrf_k": 90,
+    "bm25_top_k": 50,
+    "w_vec": 1.5,
+    "w_lex": 1.0,
+    "recall@1": 0.833,
+    "recall@3": 0.889,
+    "recall@5": 0.917
+  }
+]

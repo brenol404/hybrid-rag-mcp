@@ -57,6 +57,8 @@ class RAGEngine:
             bm25_top_k=self._settings.bm25_top_k,
             reranker=self._reranker,
             rerank_budget=self._settings.rerank_budget,
+            rrf_k=self._settings.rrf_k,
+            rrf_weights=(self._settings.rrf_w_vector, self._settings.rrf_w_lexical),
         )
 
     # ----- Geração com rastreabilidade (agente multi-step) --------------------
@@ -74,6 +76,8 @@ class RAGEngine:
                 bm25_top_k=settings.bm25_top_k,
                 reranker=self._reranker,
                 rerank_budget=settings.rerank_budget,
+                rrf_k=settings.rrf_k,
+                rrf_weights=(settings.rrf_w_vector, settings.rrf_w_lexical),
             )
 
         result = run_agent(

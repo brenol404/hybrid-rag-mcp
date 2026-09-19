@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     chunk_overlap: int = 64
     top_k: int = 5
     bm25_top_k: int = 10
+    rrf_k: int = 60
+    rrf_w_vector: float = 1.0
+    rrf_w_lexical: float = 1.5
     rerank_model: str = ""
     rerank_budget: int = 20
     ask_max_iterations: int = 2

@@ -46,11 +46,11 @@ Gatilho do CI: **falha se `recall@1 < 0.8`**.
 
 | k  | recall@k | nDCG@k |
 |----|----------|--------|
-| 1  | **0.833** | 0.833 |
-| 3  | **1.000** | 0.836 |
-| 5  | **1.000** | 0.907 |
+| 1  | **0.917** | 0.917 |
+| 3  | **1.000** | 0.865 |
+| 5  | **1.000** | 0.945 |
 
-Números honestos sobre texto real: `recall@1 = 0.833`, mas a fonte certa está sempre no top-3. Rode localmente com `python -m hybrid_rag_mcp.eval`.
+Números honestos sobre texto real: a fonte certa está no top-1 em 91,7% dos casos e sempre no top-3. `tools/grid_search.py` varre pesos RRF/top_k e chega a esse resultado (peso léxico 1.5) — histórico em `eval/grid_results.json`. Rode localmente com `python -m hybrid_rag_mcp.eval`.
 
 ## Corpus
 

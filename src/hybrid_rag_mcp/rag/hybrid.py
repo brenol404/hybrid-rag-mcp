@@ -6,18 +6,26 @@ from ..stores import LexicalStore, VectorStore
 
 
 def rrf_fusion(
-    vector_hits: list[SearchHit], lexical_hits: list[SearchHit], k: int = 60
+    vector_hits: list[SearchHit],
+    lexical_hits: list[SearchHit],
+    k: int = 60,
+    weights: tuple[float, float] = (1.0, 1.0),
 ) -> list[SearchHit]:
-    """Combina resultados de busca vetorial e léxica via Reciprocal Rank Fusion (RRF)."""
+    """Combina resultados de busca vetorial e léxica via Reciprocal Rank Fusion (RRF).
+
+    `weights` ajusta o peso de cada lado (vetorial, léxico) sobre a contribuição
+    1/(k+rank) — default (1.0, 1.0) é o RRF puro.
+    """
+    wv, wl = weights
     scores: dict[str, float] = {}
     merged: dict[str, SearchHit] = {}
 
     for rank, hit in enumerate(vector_hits, start=1):
-        scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + 1.0 / (k + rank)
+        scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + wv / (k + rank)
         merged[hit.chunk_id] = hit
 
     for rank, hit in enumerate(lexical_hits, start=1):
-        scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + 1.0 / (k + rank)
+        scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + wl / (k + rank)
         merged[hit.chunk_id] = hit
 
     ranked = sorted(scores, key=lambda cid: scores[cid], reverse=True)
@@ -41,10 +49,12 @@ def hybrid_search(
     bm25_top_k: int,
     reranker: Reranker | None = None,
     rerank_budget: int = 20,
+    rrf_k: int = 60,
+    rrf_weights: tuple[float, float] = (1.0, 1.0),
 ) -> list[SearchHit]:
     vector_hits = vector_store.search(query, top_k=top_k)
     lexical_hits = lexical_store.search(query, top_k=bm25_top_k)
-    fused = rrf_fusion(vector_hits, lexical_hits, k=60)
+    fused = rrf_fusion(vector_hits, lexical_hits, k=rrf_k, weights=rrf_weights)
 
     if reranker is not None and rerank_budget > 0:
         budget = fused[:rerank_budget]

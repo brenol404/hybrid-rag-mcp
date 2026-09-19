@@ -41,11 +41,54 @@ class VectorStore:
                 qm.PointStruct(
                     id=_hash_point(c.chunk_id),
                     vector=v,
-                    payload={"chunk_id": c.chunk_id, "doc": c.doc_name, "text": c.content},
+                    payload={
+                        "chunk_id": c.chunk_id,
+                        "doc": c.doc_name,
+                        "text": c.content,
+                        "hid": _hash_content(c.content),
+                    },
                 )
                 for c, v in zip(chunks, vectors, strict=True)
             ],
         )
+
+    def sync_chunks(self, chunks: list[DocumentChunk]) -> dict[str, int]:
+        """Sincroniza o índice com a lista de chunks: adiciona os novos, remove órfãos.
+
+        Idempotente por hash de conteúdo: re-rodar `ingest` sem mudanças resulta em
+        `added=0` e `deleted=0` (sem re-embedding). Chunks cujo texto mudou ganham
+        hash novo e os antigos são podados.
+        """
+        added = unchanged = deleted = 0
+        if chunks:
+            target = {_hash_content(c.content) for c in chunks}
+            stored = self._client.scroll(
+                collection_name=self.COLLECTION,
+                limit=10000,
+                with_payload=True,
+                with_vectors=False,
+            )[0]
+            present: set[int] = set()
+            stale_ids: list[int] = []
+            for p in stored:
+                if not p.payload:
+                    continue
+                hid = int(p.payload.get("hid") or _hash_content(p.payload.get("text", "")))
+                present.add(hid)
+                if hid not in target:
+                    stale_ids.append(p.id)
+            if stale_ids:
+                self._client.delete(
+                    collection_name=self.COLLECTION,
+                    points_selector=qm.PointIdsList(points=stale_ids),
+                )
+            to_add = [c for c in chunks if _hash_content(c.content) not in present]
+            added = len(to_add)
+            unchanged = len(chunks) - added
+            deleted = len(stale_ids)
+            if to_add:
+                self.upsert_chunks(to_add)
+        return {"added": added, "deleted": deleted, "unchanged": unchanged}
 
     def search(self, query: str, top_k: int) -> list[SearchHit]:
         query_vector = self._embedder.embed([query])[0]
@@ -91,3 +134,11 @@ class VectorStore:
 
 def _hash_point(chunk_id: str) -> int:
     return int.from_bytes(hashlib.blake2b(chunk_id.encode("utf-8"), digest_size=16).digest(), "big")
+
+
+def _hash_content(text: str) -> int:
+    """Fingerprint do conteúdo normalizado — identifica o chunk ideal, não a posição."""
+    normalized = " ".join(text.split())
+    return int.from_bytes(
+        hashlib.blake2b(normalized.encode("utf-8"), digest_size=16).digest(), "big"
+    )

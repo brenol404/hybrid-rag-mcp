@@ -15,6 +15,7 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 - **Re-ranking opcional**: cross-encoder (Ollama `/api/rerank`, ex. `bge-reranker-v2-m3`) com *degradação graciosa*.
 - **Fallback resiliente**: provedor de nuvem (OpenAI-compatible) na frente, **Ollama local como reserva** quando a API cai.
 - **Persistência**: os chunks ficam no Qdrant; o índice BM25 é **restaurado no startup** sem re-ingestão.
+- **Ingestão incremental**: re-rodar `ingest` só embeda o que mudou (idempotente por hash de conteúdo) e poda órfãos — barato em CI e em re-deploys.
 - **Rastreabilidade**: `trace` por passo do agente + `audit.jsonl` (pergunta, provedor, iterações, latência, fontes).
 - **Mensurável**: pipeline de avaliação `recall@k` / `nDCG@k` com **gate de qualidade no CI**.
 - **Dois transportes**: stdio (RPC local) e **streamable HTTP** (`http://host:port/mcp`).
@@ -118,7 +119,7 @@ se a API falhar ou ficar offline.
 
 | Tool    | Descrição |
 |---------|-----------|
-| `ingest` | Indexa `md`/`txt`/`pdf` de um diretório nos dois índices (Qdrant + BM25). |
+| `ingest` | Indexa `md`/`txt`/`pdf` de um diretório nos dois índices (Qdrant + BM25). Incremental: só re-embeda chunks alterados. |
 | `search` | Busca híbrida (RRF, com re-ranking opcional) retornando trechos + fontes. |
 | `ask`    | Agente multi-step: recupera, gera, detecta contexto insuficiente, refaz a busca e responde citando fontes (com audit log). |
 

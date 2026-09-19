@@ -26,7 +26,11 @@ def ingest(corpus_dir: str = "") -> str:
     engine = _ensure_engine()
     directory = corpus_dir or get_settings().corpus_dir
     stats = engine.ingest(directory)
-    return f"Indexado: {stats['documents']} documentos, {stats['chunks']} chunks."
+    return (
+        f"Indexado: {stats['documents']} documentos, {stats['chunks']} chunks "
+        f"(+{stats['added']} novos, {stats['unchanged']} inalterados, "
+        f"-{stats['deleted']} órfãos; {stats['indexed']} no índice)."
+    )
 
 
 @mcp.tool()

@@ -48,9 +48,17 @@ def ingest_directory(
         total_chunks.extend(chunks)
         stats[path.name] = len(chunks)
 
-    # Reconstrução atômica: embedding + upsert nos dois índices.
-    if total_chunks:
-        vector_store.upsert_chunks(total_chunks)
-        lexical_store.upsert_chunks(total_chunks)
+    # Sincronização incremental: embed somente chunks novos, poda órfãos.
+    sync = vector_store.sync_chunks(total_chunks)
+    stored = vector_store.all_chunks()
+    lexical_store.rebuild(stored)
 
-    return {"documents": len(stats), "chunks": len(total_chunks), "per_doc": stats}
+    return {
+        "documents": len(stats),
+        "chunks": len(total_chunks),
+        "added": sync["added"],
+        "deleted": sync["deleted"],
+        "unchanged": sync["unchanged"],
+        "indexed": len(stored),
+        "per_doc": stats,
+    }

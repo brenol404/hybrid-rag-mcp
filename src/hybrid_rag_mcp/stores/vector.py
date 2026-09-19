@@ -66,6 +66,28 @@ class VectorStore:
             for h in hits
         ]
 
+    def all_chunks(self) -> list[DocumentChunk]:
+        """Recarrega todos os chunks persistidos (base da persistência do BM25)."""
+        points = self._client.scroll(
+            collection_name=self.COLLECTION,
+            limit=10000,
+            with_payload=True,
+            with_vectors=False,
+        )[0]
+        return [
+            DocumentChunk(
+                chunk_id=p.payload["chunk_id"],
+                doc_name=p.payload["doc"],
+                content=p.payload["text"],
+                index=0,
+            )
+            for p in points
+            if p.payload
+        ]
+
+    def close(self) -> None:
+        self._client.close()
+
 
 def _hash_point(chunk_id: str) -> int:
     return int.from_bytes(hashlib.blake2b(chunk_id.encode("utf-8"), digest_size=16).digest(), "big")

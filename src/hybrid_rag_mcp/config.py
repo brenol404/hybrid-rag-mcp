@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     chunk_overlap: int = 64
     top_k: int = 5
     bm25_top_k: int = 10
+    rerank_model: str = ""
+    rerank_budget: int = 20
 
 
 @lru_cache

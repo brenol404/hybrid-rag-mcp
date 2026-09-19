@@ -7,6 +7,7 @@ from pathlib import Path
 from ..config import Settings, get_settings
 from ..models import AskResult, SearchHit, TraceStep
 from ..providers import FallbackLLM, resolve_embedder
+from ..providers.rerank import build_reranker
 from ..stores import LexicalStore, VectorStore
 from .hybrid import hybrid_search
 from .ingestion import ingest_directory
@@ -25,7 +26,19 @@ class RAGEngine:
         self._embedder = resolve_embedder(settings)
         self._vector = VectorStore(settings, self._embedder)
         self._lexical = LexicalStore()
+        self._reranker = build_reranker(settings)
         self._llm = FallbackLLM(settings)
+        self._restore_lexical()
+
+    def _restore_lexical(self) -> None:
+        """Persistência do BM25: reconstrói o índice léxico a partir dos chunks salvos no Qdrant."""
+        stored = self._vector.all_chunks()
+        if stored:
+            self._lexical.upsert_chunks(stored)
+
+    def close(self) -> None:
+        """Libera o lock do Qdrant local. Use entre instâncias no mesmo processo."""
+        self._vector.close()
 
     # ----- Ingestão ----------------------------------------------------------
     def ingest(self, corpus_dir: str | None = None) -> dict[str, int]:
@@ -47,6 +60,8 @@ class RAGEngine:
             query,
             top_k=top_k,
             bm25_top_k=self._settings.bm25_top_k,
+            reranker=self._reranker,
+            rerank_budget=self._settings.rerank_budget,
         )
 
     # ----- Geração com rastreabilidade ----------------------------------------
@@ -62,6 +77,8 @@ class RAGEngine:
             question,
             top_k=top_k,
             bm25_top_k=settings.bm25_top_k,
+            reranker=self._reranker,
+            rerank_budget=settings.rerank_budget,
         )
         trace.append(TraceStep("retrieval", f"{len(sources)} fontes (hybrid RRF)"))
 

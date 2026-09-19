@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..models import SearchHit
+from ..providers.rerank import Reranker
 from ..stores import LexicalStore, VectorStore
 
 
@@ -38,7 +39,29 @@ def hybrid_search(
     query: str,
     top_k: int,
     bm25_top_k: int,
+    reranker: Reranker | None = None,
+    rerank_budget: int = 20,
 ) -> list[SearchHit]:
     vector_hits = vector_store.search(query, top_k=top_k)
     lexical_hits = lexical_store.search(query, top_k=bm25_top_k)
-    return rrf_fusion(vector_hits, lexical_hits, k=60)[:top_k]
+    fused = rrf_fusion(vector_hits, lexical_hits, k=60)
+
+    if reranker is not None and rerank_budget > 0:
+        budget = fused[:rerank_budget]
+        texts = [h.content for h in budget]
+        scores = reranker.score(query, texts)
+        budget = [
+            SearchHit(
+                chunk_id=h.chunk_id,
+                doc_name=h.doc_name,
+                content=h.content,
+                score=float(score),
+                strategy="hybrid",
+            )
+            for h, score in sorted(
+                zip(budget, scores, strict=True), key=lambda t: t[1], reverse=True
+            )
+        ]
+        return budget[:top_k]
+
+    return fused[:top_k]

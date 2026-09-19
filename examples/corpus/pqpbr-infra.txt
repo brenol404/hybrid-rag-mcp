@@ -1,0 +1,18 @@
+# Infraestrutura como Código Pqpbr
+
+## Terraform
+A infraestrutura do servidor Pqpbr é provisionada com Terraform. Os módulos
+estão organizados por camada: rede, computação e armazenamento. Os estados são
+mantidos em um bucket remoto com lock via DynamoDB.
+
+## Observabilidade
+Toda instância publica métricas Prometheus e traces OpenTelemetry. O Grafana
+agrega os dashboards por serviço. A latência p95 deve ficar abaixo de 200ms.
+
+## Testes de Carga
+Usamos K6 para testes de carga em CI. O cenário padrão simula 10 mil usuários
+concorrentes durante 15 minutos com tolerância máxima de 1% de erro.
+
+## Chaos Engineering
+O agente de caos encerra réplicas aleatórias em produção para validar o
+failover automático. Esse teste roda semanalmente na madrugada de domingo.

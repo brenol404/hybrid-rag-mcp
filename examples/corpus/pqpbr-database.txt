@@ -1,0 +1,19 @@
+# Guia de Banco de Dados Pqpbr
+
+## ClickHouse para Telemetria
+O servidor Pqpbr usa ClickHouse como banco analítico principal para armazenar
+telemetria. As tabelas são particionadas por dia e ordenadas por timestamp,
+o que acelera consultas de séries temporais em até 40 vezes comparado ao PostgreSQL.
+
+## Uso de PostgreSQL
+PostgreSQL fica reservado para dados transacionais: usuários, permissões e
+configuração. Não envie eventos de telemetria para o PostgreSQL, pois isso
+estraga o cache de buffer e degrada consultas OLTP.
+
+## Redis como Cache
+Redis é usado como cache de leitura e rate limiting. As chaves de rate limit
+usam janela deslizante de 60 segundos e expiram automaticamente.
+
+## SurrealDB
+Avaliamos SurrealDB em 2024 para armazenamento de grafos de relações entre
+serviços, porém mantivemos o modelo relacional padrão por questão de maturidade.

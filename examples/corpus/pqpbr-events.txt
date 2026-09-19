@@ -1,0 +1,14 @@
+# Processamento de Eventos Pqpbr
+
+## Kafka como Barramento de Eventos
+O barramento interno usa Kafka com três partições por tópico e fator de
+replicação três. Os dados de telemetria são publicados pelo servidor e
+consumidos por pipelines de agregação.
+
+## Produtor e Consumidor
+O produtor publica com garantia acks=all. Consumidores registram checkpoints
+para garantir exactly-once após falhas. A retenção de mensagens é de 30 dias.
+
+## Integração com ClickHouse
+Os consumidores gravam mini-batches no ClickHouse a cada 5 segundos. Esse
+fluxo alimenta os dashboards de séries temporais em tempo quase real.

@@ -1,0 +1,12 @@
+{"id": "q01", "query": "Em qual porta o servidor Pqpbr escuta por padrão?", "relevant": ["pqpbr-operations.txt"]}
+{"id": "q02", "query": "Quanto tempo leva a eleição de um novo primário em caso de falha?", "relevant": ["pqpbr-operations.txt"]}
+{"id": "q03", "query": "De quantas em quantas horas são executados os backups incrementais?", "relevant": ["pqpbr-operations.txt"]}
+{"id": "q04", "query": "Qual a duração dos tokens JWT emitidos pelo serviço de identidade?", "relevant": ["pqpbr-security.pdf.txt"]}
+{"id": "q05", "query": "Como o gateway de inferência protege contra ataques de cost exhaustion?", "relevant": ["pqpbr-security.pdf.txt"]}
+{"id": "q06", "query": "Qual banco é usado para armazenar telemetria de séries temporais?", "relevant": ["pqpbr-database.txt"]}
+{"id": "q07", "query": "Qual ferramenta serve de cache para leitura e rate limiting?", "relevant": ["pqpbr-database.txt"]}
+{"id": "q08", "query": "Qual o limite de latência p95 aceito nos dashboards de Grafana?", "relevant": ["pqpbr-infra.txt"]}
+{"id": "q09", "query": "Como o estado do Terraform é protegido contra escritas concorrentes?", "relevant": ["pqpbr-infra.txt"]}
+{"id": "q10", "query": "Quantas partições cada tópico do Kafka possui por padrão?", "relevant": ["pqpbr-events.txt"]}
+{"id": "q11", "query": "Qual a garantia de entrega usada pelo produtor Kafka para telemetria?", "relevant": ["pqpbr-events.txt"]}
+{"id": "q12", "query": "Como o failover de réplicas é testado em produção?", "relevant": ["pqpbr-infra.txt"]}

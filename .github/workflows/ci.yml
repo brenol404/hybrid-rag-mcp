@@ -39,6 +39,27 @@ jobs:
           print('tools OK:', sorted(t.name for t in tools))
           "
 
+      - name: HTTP smoke test (endpoint streamable responde sem Ollama)
+        run: |
+          python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000 &
+          SERVER_PID=$!
+          sleep 5
+          python -c "
+          import asyncio, json
+          from mcp import ClientSession
+          from mcp.client.streamable_http import streamable_http_client
+          async def main():
+              async with streamable_http_client('http://127.0.0.1:8000/mcp') as (read, write):
+                  async with ClientSession(read, write) as session:
+                      await session.initialize()
+                      tools = await session.list_tools()
+                      names = {t.name for t in tools.tools}
+                      assert names == {'ask', 'ingest', 'search'}, names
+                      print('HTTP tools OK:', sorted(names))
+          asyncio.run(main())
+          "
+          kill $SERVER_PID || true
+
   eval:
     runs-on: ubuntu-latest
     steps:

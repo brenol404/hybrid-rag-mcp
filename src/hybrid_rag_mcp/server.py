@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 
 from mcp.server.mcpserver import MCPServer
@@ -61,8 +62,22 @@ def _format_hits(hits) -> str:
 
 
 def main() -> None:
-    """Ponto de entrada da CLI: serve o MCP via stdio."""
-    asyncio.run(mcp.run_stdio_async())
+    """Ponto de entrada da CLI: serve o MCP via stdio (padrão) ou streamable HTTP."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="stdio: RPC local; http: endpoint MCP streamable (http://host:port/mcp)",
+    )
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args()
+
+    if args.transport == "http":
+        asyncio.run(mcp.run_streamable_http_async(host=args.host, port=args.port))
+    else:
+        asyncio.run(mcp.run_stdio_async())
 
 
 if __name__ == "__main__":

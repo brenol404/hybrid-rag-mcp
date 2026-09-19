@@ -40,16 +40,21 @@ flowchart LR
 
 ## Métricas (gate de qualidade no CI)
 
-Pipeline de avaliação sobre `eval/dataset.jsonl` — 12 queries, ground-truth por documento.
+Pipeline de avaliação sobre **36 queries** — 12 curadas manualmente em `eval/dataset.jsonl` + 24 geradas automaticamente de documentos reais (`eval/dataset.real.jsonl`, veja [Corpus](#corpus)).
 Gatilho do CI: **falha se `recall@1 < 0.8`**.
 
 | k  | recall@k | nDCG@k |
 |----|----------|--------|
-| 1  | **1.000** | 1.000  |
-| 3  | **1.000** | 0.858  |
-| 5  | **1.000** | 0.945  |
+| 1  | **0.833** | 0.833 |
+| 3  | **1.000** | 0.836 |
+| 5  | **1.000** | 0.907 |
 
-Rode localmente com `python -m hybrid_rag_mcp.eval`.
+Números honestos sobre texto real: `recall@1 = 0.833`, mas a fonte certa está sempre no top-3. Rode localmente com `python -m hybrid_rag_mcp.eval`.
+
+## Corpus
+
+- `examples/corpus/` — **11 documentos**: 5 fictícios (operations/security/database/infra/events) + 6 livros reais de domínio público (Project Gutenberg): Chekhov, Machado de Assis, Aluísio Azevedo, Eça de Queirós, Jane Austen e Conan Doyle, misturando PT e EN.
+- `tools/fetch_corpus.py` — baixa o catálogo do Gutenberg e **gera o dataset de avaliação automaticamente**: cada consulta é um trecho real do documento e o documento esperado é a fonte exata desse trecho (ground-truth auto-supervisionado, sem curadoria manual).
 
 ## Como rodar
 

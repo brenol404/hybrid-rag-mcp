@@ -1,7 +1,7 @@
 """Avaliação do pipeline de retrieval: recall@k e nDCG@k sobre dataset de ground-truth.
 
 Uso:
-    python -m hybrid_rag_mcp.eval                     # usa eval/dataset.jsonl + corpus padrão
+    python -m hybrid_rag_mcp.eval                     # usa eval/dataset.jsonl + eval/dataset.real.jsonl
     python -m hybrid_rag_mcp.eval --dataset path.jsonl --corpus dir/
 """
 
@@ -11,6 +11,7 @@ import argparse
 import json
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .config import get_settings
 from .rag.engine import RAGEngine
@@ -47,6 +48,17 @@ class EvalReport:
 def load_dataset(path: str) -> list[dict]:
     with open(path, encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
+
+
+def load_datasets(*paths: str) -> list[dict]:
+    """Carrega, em ordem, todos os datasets existentes; ignora os ausentes."""
+    rows: list[dict] = []
+    for path in paths:
+        if Path(path).exists():
+            rows.extend(load_dataset(path))
+        else:
+            print(f"  (sem dataset: {path})")
+    return rows
 
 
 def relevance(hit_doc: str, relevant: set[str]) -> float:
@@ -110,7 +122,12 @@ def format_report(report: EvalReport) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", default="eval/dataset.jsonl")
+    parser.add_argument(
+        "--dataset",
+        default=["eval/dataset.jsonl", "eval/dataset.real.jsonl"],
+        nargs="*",
+        help="arquivos jsonl (padrão: manual + real)",
+    )
     parser.add_argument("--corpus", default=None)
     parser.add_argument("--ks", default="1,3,5", help="valores de k, separados por vírgula")
     args = parser.parse_args()
@@ -123,7 +140,8 @@ def main() -> None:
     engine.ingest(settings.corpus_dir)
     ks = tuple(int(k) for k in args.ks.split(","))
 
-    report = evaluate(engine, load_dataset(args.dataset), ks)
+    datasets = [args.dataset] if len(args.dataset) == 1 else args.dataset
+    report = evaluate(engine, load_datasets(*datasets), ks)
     print(format_report(report))
 
 

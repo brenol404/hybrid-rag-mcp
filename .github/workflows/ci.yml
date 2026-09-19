@@ -90,13 +90,12 @@ jobs:
       - name: Enforce minimum quality (recall@1 >= 0.8)
         run: |
           python -c "
-          import sys
-          from hybrid_rag_mcp.eval import evaluate, load_dataset, EvalReport
+          from hybrid_rag_mcp.eval import evaluate, load_datasets, EvalReport
           from hybrid_rag_mcp.config import get_settings
           from hybrid_rag_mcp.rag.engine import RAGEngine
           rag = RAGEngine(get_settings())
           rag.ingest('examples/corpus')
-          rep = evaluate(rag, load_dataset('eval/dataset.jsonl'), (1, 3, 5))
+          rep = evaluate(rag, load_datasets('eval/dataset.jsonl', 'eval/dataset.real.jsonl'), (1, 3, 5))
           r1 = rep.mean_recall(1)
           print(rep)
           print('recall@1 =', round(r1, 3))

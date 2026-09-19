@@ -28,3 +28,8 @@ class LLMProvider(ABC):
     @abstractmethod
     def complete(self, system: str, user: str) -> LLMResponse:
         """Gera uma resposta. Levanta exceção se indisponível."""
+
+    def complete_stream(self, system: str, user: str):
+        """Gera a resposta em chunks (tokens/trechos). Default: não-streaming."""
+        resp = self.complete(system, user)
+        yield resp

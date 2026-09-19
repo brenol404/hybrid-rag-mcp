@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from ..config import Settings, get_settings
@@ -62,7 +63,13 @@ class RAGEngine:
         )
 
     # ----- Geração com rastreabilidade (agente multi-step) --------------------
-    def ask(self, question: str, top_k: int | None = None) -> AskResult:
+    def ask(
+        self,
+        question: str,
+        top_k: int | None = None,
+        on_event: Callable[[str], None] | None = None,
+        on_tokens: Callable[[str], None] | None = None,
+    ) -> AskResult:
         settings = self._settings
         top_k = top_k or settings.top_k
         t0 = time.perf_counter()
@@ -84,8 +91,11 @@ class RAGEngine:
             question,
             retrieve=retrieve,
             generate=lambda system, user: self._llm.complete(system, user),
+            generate_stream=lambda system, user: self._llm.complete_stream(system, user),
             max_iterations=settings.ask_max_iterations,
             top_k=top_k,
+            on_event=on_event,
+            on_tokens=on_tokens,
         )
         result.trace.append(
             TraceStep(

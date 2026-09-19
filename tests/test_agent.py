@@ -68,3 +68,38 @@ def test_agente_cap_no_limite_de_iteracoes() -> None:
     )
     assert result.iterations == 2
     assert any(t.step == "generation" and not t.ok for t in result.trace)
+
+
+def test_agente_emite_eventos_de_progresso() -> None:
+    events: list[str] = []
+    run_agent(
+        "pergunta",
+        retrieve=lambda q, k: _hits("a"),
+        generate=lambda system, user: LLMResponse("resposta [a].", "ollama", "qwen3"),
+        max_iterations=2,
+        on_event=events.append,
+    )
+    assert any("buscando contexto" in e for e in events)
+    assert any("gerando resposta" in e for e in events)
+
+
+def test_agente_streama_tokens_quando_provider_streama() -> None:
+    tokens: list[str] = []
+    event_log: list[str] = []
+
+    def stream(system, user):
+        for part in ("Olá,", " mundo", " [a]."):
+            yield LLMResponse(part, "ollama", "qwen3")
+
+    result = run_agent(
+        "pergunta",
+        retrieve=lambda q, k: _hits("a"),
+        generate=lambda system, user: LLMResponse("não deve ser usado", "ollama", "qwen3"),
+        max_iterations=2,
+        on_event=event_log.append,
+        on_tokens=tokens.append,
+        generate_stream=stream,
+    )
+    assert result.answer == "Olá, mundo [a]."
+    assert "".join(tokens) == result.answer
+    assert result.provider == "ollama" and result.model == "qwen3"

@@ -85,6 +85,11 @@ print(rag.ask('De quantas em quantas horas são os backups?'))  # agente com fon
 
 **stdio:** cliente de exemplo — `python examples/client.py "Qual a porta padrão?"`
 
+**Streaming de progresso (tokens + etapas):**
+`python examples/client_stream.py "Qual a política de manutenção do banco?"` — o servidor
+emite eventos de etapa e tokens da resposta em tempo real via `notifications/progress`
+(o cliente envia um `progressToken` no request).
+
 **HTTP:**
 
 ```bash

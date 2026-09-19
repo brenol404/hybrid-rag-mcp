@@ -24,6 +24,17 @@ class OllamaLLM(LLMProvider):
             text=resp["message"]["content"], provider=self.provider_name, model=self._model
         )
 
+    def complete_stream(self, system: str, user: str):
+        resp = self._client.chat(
+            model=self._model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            stream=True,
+        )
+        for chunk in resp:
+            delta = chunk["message"]["content"]
+            if delta:
+                yield LLMResponse(text=delta, provider=self.provider_name, model=self._model)
+
 
 class CloudLLM(LLMProvider):
     """Cliente OpenAI-compatible (OpenAI, Anthropic via gateway, Together, Groq...)."""
@@ -77,3 +88,22 @@ class FallbackLLM:
                 errors.append(f"{provider.provider_name}: {exc}")
                 time.sleep(0.2)
         raise RuntimeError(f"Todos os provedores de LLM falharam: {'; '.join(errors)}")
+
+    def complete_stream(self, system: str, user: str):
+        """Streaming com fallback entre provedores: o primeiro que emitir vence."""
+        errors: list[str] = []
+        for provider in self._providers:
+            gen = provider.complete_stream(system, user)
+            try:
+                first = next(gen)
+            except StopIteration:
+                errors.append(f"{provider.provider_name}: resposta vazia")
+                continue
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{provider.provider_name}: {exc}")
+                time.sleep(0.2)
+                continue
+            yield first
+            yield from gen
+            return
+        raise RuntimeError(f"Todos os provedores de LLM falharam ao gerar: {'; '.join(errors)}")

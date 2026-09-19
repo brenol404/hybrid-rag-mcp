@@ -9,7 +9,7 @@ o loop refaz a busca com essa pergunta. Cada passo gera um TraceStep.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from ..models import AskResult, SearchHit, TraceStep
 from ..providers.base import LLMResponse
@@ -28,6 +28,7 @@ _MORE_CONTEXT = re.compile(r"^\s*\[MORE_CONTEXT\]\s*(.+)$", re.IGNORECASE | re.M
 
 RetrieveFn = Callable[[str, int], list[SearchHit]]
 GenerateFn = Callable[[str, str], LLMResponse]
+StreamFn = Callable[[str, str], Iterator[LLMResponse]]
 
 
 def extract_follow_up(text: str) -> str | None:
@@ -45,13 +46,22 @@ def run_agent(
     generate: GenerateFn,
     max_iterations: int = 2,
     top_k: int = 5,
+    on_event: Callable[[str], None] | None = None,
+    on_tokens: Callable[[str], None] | None = None,
+    generate_stream: StreamFn | None = None,
 ) -> AskResult:
     used: dict[str, SearchHit] = {}
     trace: list[TraceStep] = [TraceStep("ask", question)]
     current_question = question
     last_answer = ""
+    last_provider = last_model = ""
+
+    def emit(message: str) -> None:
+        if on_event:
+            on_event(message)
 
     for iteration in range(1, max_iterations + 1):
+        emit(f"iteração {iteration}: buscando contexto…")
         hits = retrieve(current_question, top_k)
         new = [h for h in hits if h.chunk_id not in used]
         for h in new:
@@ -63,12 +73,23 @@ def run_agent(
                 f"iteração {iteration}: {len(new)} novas fontes de {len(hits)} (total {len(used)})",
             )
         )
+        emit(f"iteração {iteration}: {len(new)} novos trechos, {len(used)} ao total")
 
         prompt = (
             f"Contexto fornecido até agora:\n{format_context(list(used.values()))}\n\n"
             f"Pergunta: {current_question}"
         )
-        resp = generate(SYSTEM_PROMPT, prompt)
+        emit(f"iteração {iteration}: gerando resposta…")
+        if on_tokens is not None and generate_stream is not None:
+            pieces: list[str] = []
+            for chunk in generate_stream(SYSTEM_PROMPT, prompt):
+                last_provider, last_model = chunk.provider, chunk.model
+                pieces.append(chunk.text)
+                on_tokens(chunk.text)
+            resp = LLMResponse(text="".join(pieces), provider=last_provider, model=last_model)
+        else:
+            resp = generate(SYSTEM_PROMPT, prompt)
+            last_provider, last_model = resp.provider, resp.model
         last_answer = resp.text
         trace.append(
             TraceStep(
@@ -78,6 +99,7 @@ def run_agent(
 
         follow_up = extract_follow_up(resp.text)
         if follow_up is None:
+            emit("contexto suficiente — resposta pronta")
             return AskResult(
                 answer=resp.text,
                 sources=list(used.values()),
@@ -89,16 +111,18 @@ def run_agent(
         trace.append(
             TraceStep("follow_up", f"iteração {iteration}: nova busca → {follow_up!r}", ok=True)
         )
+        emit(f"contexto insuficiente — refazendo busca: {follow_up!r}")
         current_question = follow_up
 
     trace.append(
         TraceStep("generation", f"limite de {max_iterations} iterações atingido", ok=False)
     )
+    emit(f"limite de {max_iterations} iterações atingido")
     return AskResult(
         answer=last_answer,
         sources=list(used.values()),
-        provider="?",
-        model="?",
+        provider=last_provider or "?",
+        model=last_model or "?",
         trace=trace,
         iterations=max_iterations,
     )

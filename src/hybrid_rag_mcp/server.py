@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import queue
+import threading
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
 from .config import get_settings
 from .rag.engine import RAGEngine
@@ -44,10 +46,49 @@ def search(query: str, top_k: int = 5) -> str:
 
 
 @mcp.tool()
-def ask(question: str, top_k: int = 5) -> str:
-    """Responde a pergunta com RAG usando o provedor disponível (fallback offline via Ollama)."""
+async def ask(question: str, context: Context, top_k: int = 5) -> str:
+    """Responde com RAG e faz streaming do progresso/tokens via progress notifications."""
     engine = _ensure_engine()
-    result = engine.ask(question, top_k=top_k)
+    channel: queue.Queue = queue.Queue()
+
+    def emit(event: str) -> None:
+        channel.put(("event", event))
+
+    def on_token(delta: str) -> None:
+        channel.put(("token", delta))
+
+    def runner() -> None:
+        try:
+            result = engine.ask(question, top_k=top_k, on_event=emit, on_tokens=on_token)
+            channel.put(("result", result))
+        except Exception as exc:  # noqa: BLE001 - resposta de erro volta como texto
+            channel.put(("error", str(exc)))
+
+    thread = threading.Thread(target=runner, daemon=True)
+    thread.start()
+
+    result = None
+    error = None
+    token_count = 0
+    while True:
+        try:
+            kind, payload = channel.get(timeout=0.25)
+        except queue.Empty:
+            if not thread.is_alive() and channel.empty():
+                break
+            continue
+        if kind == "event":
+            await context.report_progress(0, None, payload)
+        elif kind == "token":
+            token_count += 1
+            await context.report_progress(token_count, None, payload)
+        elif kind == "result":
+            result = payload
+        elif kind == "error":
+            error = payload
+
+    if error is not None:
+        return f"Erro: {error}"
     return f"[{result.provider}/{result.model}]\n{result.answer}\n\n--- Fontes ---\n{_format_hits(result.sources)}"
 
 

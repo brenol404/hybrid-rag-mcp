@@ -83,14 +83,10 @@ jobs:
       - name: Install package
         run: pip install -e ".[dev]"
 
-      - name: Run retrieval eval (recall@k / nDCG@k)
-        run: |
-          python -m hybrid_rag_mcp.eval
-
-      - name: Enforce minimum quality (recall@1 >= 0.8)
+      - name: Run retrieval eval + enforce minimum quality (recall@1 >= 0.8)
         run: |
           python -c "
-          from hybrid_rag_mcp.eval import evaluate, load_datasets, EvalReport
+          from hybrid_rag_mcp.eval import evaluate, load_datasets
           from hybrid_rag_mcp.config import get_settings
           from hybrid_rag_mcp.rag.engine import RAGEngine
           rag = RAGEngine(get_settings())
@@ -99,5 +95,6 @@ jobs:
           r1 = rep.mean_recall(1)
           print(rep)
           print('recall@1 =', round(r1, 3))
+          rag.close()
           assert r1 >= 0.8, f'recall@1 = {r1} abaixo do limite 0.8'
           "

@@ -1,67 +1,95 @@
 # hybrid-rag-mcp
 
-Agente local orientado a tarefas com **RAG híbrido** (busca vetorial + BM25) exposto via **[Model Context Protocol (MCP)](https://modelcontextprotocol.io)** e **fallback offline** via **[Ollama](https://ollama.com)**.
+[![CI](https://github.com/brenol404/hybrid-rag-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/brenol404/hybrid-rag-mcp/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas com fontes citadas — o mesmo padrão que conecta LLMs a bases locais/corporativas em 2026/2027.
+> Serve MCP com **RAG híbrido** (Qdrant vetorial + BM25 léxico via RRF), **agente multi-step** com fallback offline via **Ollama** e transporte **stdio** ou **streamable HTTP**.
 
-## Por que esse projeto existe
+Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas com **fontes citadas**, de forma **100% local** — o padrão que conecta LLMs a bases locais/corporativas em 2026/2027.
 
-- **MCP** padronizou como agentes acessam dados locais — este servidor é um exemplo pronto.
-- **RAG híbrido** *(vetorial + léxico)* supera RAG só-semântico: BM25 captura termos exatos, vetores capturam sentido.
-- **Execução 100% local** (Qdrant em modo embarcado + Ollama): zero custo de nuvem e privacidade dos dados.
-- **Fallback resiliente**: se um provedor de nuvem estiver configurado, o sistema usa-o e cai automaticamente para o modelo local quando a rede/API falhar.
-- **Rastreabilidade**: cada consulta gera um `trace` e registros em `audit.jsonl` (quem perguntou o quê, provedor usado, latência).
+## Destaques
+
+- **Busca híbrida**: embedding (Qdrant local, sem Docker) + BM25 próprio (idf suavizado), fundidos por **RRF**.
+- **Agente multi-step**: se o contexto da 1ª busca for insuficiente, o modelo sinaliza `[MORE_CONTEXT]`, o agente gera uma busca de follow-up e repete com **memória incremental de fontes**.
+- **Re-ranking opcional**: cross-encoder (Ollama `/api/rerank`, ex. `bge-reranker-v2-m3`) com *degradação graciosa*.
+- **Fallback resiliente**: provedor de nuvem (OpenAI-compatible) na frente, **Ollama local como reserva** quando a API cai.
+- **Persistência**: os chunks ficam no Qdrant; o índice BM25 é **restaurado no startup** sem re-ingestão.
+- **Rastreabilidade**: `trace` por passo do agente + `audit.jsonl` (pergunta, provedor, iterações, latência, fontes).
+- **Mensurável**: pipeline de avaliação `recall@k` / `nDCG@k` com **gate de qualidade no CI**.
+- **Dois transportes**: stdio (RPC local) e **streamable HTTP** (`http://host:port/mcp`).
 
 ## Arquitetura
 
 ```mermaid
 flowchart LR
-    C[Cliente MCP<br/>ex.: examples/client.py] -->|stdio| M[MCP Server<br/>hybrid-rag-mcp]
+    C[Cliente MCP<br/>stdio ou HTTP] -->|tools: ingest / search / ask| M[MCP Server<br/>hybrid-rag-mcp]
+    M --> AGE[Agente multi-step<br/>loop com [MORE_CONTEXT]]
     M --> I[ingest]
-    M --> S[search]
-    M --> A[ask]
     I --> C1[Chunker<br/>seções + sentenças]
     C1 --> E[Embeddings<br/>Ollama bge-m3]
     E --> Q1[(Qdrant local<br/>busca vetorial)]
-    C1 --> K[BM25<br/>busca léxica]
-    S --> Q1 & K
+    C1 --> K[BM25 próprio<br/>busca léxica]
+    AGE --> RET[Busca híbrida]
+    RET --> Q1 & K
     Q1 & K --> RRF[RRF fusion]
-    RRF --> ASK[FallbackLLM<br/>nuvem -> Ollama]
-    ASK --> L[(audit.jsonl<br/>trace + fontes)]
+    RRF --> RR[Reranker opcional<br/>Ollama /api/rerank]
+    RR --> LLM[FallbackLLM<br/>nuvem -> Ollama]
+    LLM --> AUD[audit.jsonl<br/>trace + iterações + fontes]
 ```
+
+## Métricas (gate de qualidade no CI)
+
+Pipeline de avaliação sobre `eval/dataset.jsonl` — 12 queries, ground-truth por documento.
+Gatilho do CI: **falha se `recall@1 < 0.8`**.
+
+| k  | recall@k | nDCG@k |
+|----|----------|--------|
+| 1  | **1.000** | 1.000  |
+| 3  | **1.000** | 0.858  |
+| 5  | **1.000** | 0.945  |
+
+Rode localmente com `python -m hybrid_rag_mcp.eval`.
 
 ## Como rodar
 
-Pré-requisitos: **Python 3.11+**, **Ollama** rodando (`ollama serve`).
+Pré-requisitos: **Python 3.11+**, **Ollama** de pé (`ollama serve`).
 
 ```bash
 # 1. Modelos locais (uma vez)
 ollama pull bge-m3        # embeddings
-ollama pull qwen3:8b      # geração (ou outro modelo)
+ollama pull qwen3:8b      # geração (ou outro)
+ollama pull bge-reranker-v2-m3   # opcional: somente Ollama >= 0.36
 
 # 2. Instalar
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# 3. Usar direto pela engine (Python)
+# 3. Indexar + responder (uso direto da engine)
 python -c "
 from hybrid_rag_mcp.rag.engine import RAGEngine
 rag = RAGEngine()
-print(rag.ingest())                                  # indexa examples/corpus
-print(rag.search('Qual a porta padrão do servidor?')) # busca híbrida
-print(rag.ask('Em quantas horas são os backups?'))    # resposta com fontes
+print(rag.ingest())                                    # indexa examples/corpus
+print(rag.search('Qual a porta padrão do servidor?'))  # busca híbrida
+print(rag.ask('De quantas em quantas horas são os backups?'))  # agente com fontes
 "
 ```
 
 ### Como cliente MCP
 
-O servidor fala o protocolo MCP pela stdio. Use o client de exemplo:
+**stdio:** cliente de exemplo — `python examples/client.py "Qual a porta padrão?"`
+
+**HTTP:**
 
 ```bash
-python examples/client.py "Qual a porta padrão do servidor?"
+# terminal 1
+python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000
+
+# terminal 2
+python examples/client_http.py "Qual a porta padrão?"
 ```
 
-Ou registre em qualquer cliente MCP (Claude Desktop, editores, agentes):
+Registre em qualquer cliente MCP (Claude Desktop, editores, agentes):
 
 ```json
 {
@@ -77,39 +105,42 @@ Ou registre em qualquer cliente MCP (Claude Desktop, editores, agentes):
 
 ### Fallback para nuvem (opcional)
 
-Copie `.env.example` para `.env` e preencha `CLOUD_BASE_URL` + `CLOUD_API_KEY` +
-`CLOUD_MODEL` (qualquer endpoint OpenAI-compatível). O provedor de nuvem assume a
-prioridade e o Ollama fica como reserva automática se a API falhar ou ficar offline.
+Copie `.env.example` para `.env` e preencha `CLOUD_BASE_URL` + `CLOUD_API_KEY` + `CLOUD_MODEL`
+(qualquer endpoint OpenAI-compatível). A nuvem assume prioridade; o Ollama responde automaticamente
+se a API falhar ou ficar offline.
 
 ## Ferramentas MCP
 
 | Tool    | Descrição |
 |---------|-----------|
-| `ingest` | Indexa documentos `md`/`txt`/`pdf` de um diretório nos dois índices. |
-| `search` | Busca híbrida (RRF) e retorna trechos + fontes. |
-| `ask`    | RAG completo: recupera contexto e gera resposta com fontes citadas e audit log. |
+| `ingest` | Indexa `md`/`txt`/`pdf` de um diretório nos dois índices (Qdrant + BM25). |
+| `search` | Busca híbrida (RRF, com re-ranking opcional) retornando trechos + fontes. |
+| `ask`    | Agente multi-step: recupera, gera, detecta contexto insuficiente, refaz a busca e responde citando fontes (com audit log). |
 
 ## Estrutura
 
 ```
 src/hybrid_rag_mcp/
-├── server.py          # Servidor MCP (tools: ingest, search, ask)
+├── server.py          # Servidor MCP (stdio + streamable HTTP)
 ├── config.py          # Configuração via .env (pydantic-settings)
+├── eval.py            # Avaliação recall@k / nDCG@k
 ├── rag/
+│   ├── agent.py       # Loop multi-step (memória de fontes, [MORE_CONTEXT])
 │   ├── chunker.py     # Chunking por seções markdown + sentenças
-│   ├── hybrid.py      # Fusão RRF (vetorial + léxico)
 │   ├── engine.py      # Orquestração: ingest → search → ask + audit
+│   ├── hybrid.py      # Fusão RRF + re-ranking
 │   └── ingestion.py   # Leitura de md/txt/pdf
 ├── providers/
 │   ├── embed.py       # Embeddings via Ollama
-│   └── llm.py         # FallbackLLM (nuvem → Ollama)
+│   ├── llm.py         # FallbackLLM (nuvem → Ollama)
+│   └── rerank.py      # Cross-encoder opcional (degradação graciosa)
 └── stores/
-    ├── vector.py      # Qdrant embarcado (sem Docker)
-    └── lexic.py       # BM25 próprio (idf suavizado, sem deps)
+    ├── vector.py      # Qdrant embarcado (sem Docker, persistente)
+    └── lexic.py       # BM25 com idf suavizado
 ```
 
 ## Qualidade
 
-- Testes unitários (`pytest`) sem dependência de rede ou Ollama.
-- CI via GitHub Actions: `pytest` + `ruff` (lint + format) + smoke test do MCP server.
-- `docker-compose.yml` intencionalmente ausente: funciona só com `pip install` (Qdrant embarcado).
+- **21 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval e loop do agente.
+- CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
+- `docker-compose.yml` intencionalmente ausente: roda só com `pip install` (Qdrant embarcado).

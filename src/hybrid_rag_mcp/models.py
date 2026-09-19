@@ -37,3 +37,4 @@ class AskResult:
     provider: str = ""
     model: str = ""
     trace: list[TraceStep] = field(default_factory=list)
+    iterations: int = 1

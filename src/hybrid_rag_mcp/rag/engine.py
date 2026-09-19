@@ -9,14 +9,9 @@ from ..models import AskResult, SearchHit, TraceStep
 from ..providers import FallbackLLM, resolve_embedder
 from ..providers.rerank import build_reranker
 from ..stores import LexicalStore, VectorStore
+from .agent import run_agent
 from .hybrid import hybrid_search
 from .ingestion import ingest_directory
-
-SYSTEM_PROMPT = (
-    "Você é um assistente técnico que responde usando APENAS o contexto fornecido. "
-    "Se a resposta não estiver no contexto, diga explicitamente que não encontrou. "
-    "Cite a fonte de cada afirmação entre colchetes, ex.: [manual.pdf]."
-)
 
 
 class RAGEngine:
@@ -64,47 +59,55 @@ class RAGEngine:
             rerank_budget=self._settings.rerank_budget,
         )
 
-    # ----- Geração com rastreabilidade ----------------------------------------
+    # ----- Geração com rastreabilidade (agente multi-step) --------------------
     def ask(self, question: str, top_k: int | None = None) -> AskResult:
         settings = self._settings
         top_k = top_k or settings.top_k
-        trace: list[TraceStep] = [TraceStep("ask", question)]
         t0 = time.perf_counter()
 
-        sources = hybrid_search(
-            self._vector,
-            self._lexical,
+        def retrieve(query: str, k: int) -> list[SearchHit]:
+            return hybrid_search(
+                self._vector,
+                self._lexical,
+                query,
+                top_k=k,
+                bm25_top_k=settings.bm25_top_k,
+                reranker=self._reranker,
+                rerank_budget=settings.rerank_budget,
+            )
+
+        result = run_agent(
             question,
+            retrieve=retrieve,
+            generate=lambda system, user: self._llm.complete(system, user),
+            max_iterations=settings.ask_max_iterations,
             top_k=top_k,
-            bm25_top_k=settings.bm25_top_k,
-            reranker=self._reranker,
-            rerank_budget=settings.rerank_budget,
         )
-        trace.append(TraceStep("retrieval", f"{len(sources)} fontes (hybrid RRF)"))
-
-        context = "\n\n".join(f"[{s.doc_name}] {s.content}" for s in sources)
-        try:
-            resp = self._llm.complete(
-                SYSTEM_PROMPT, f"Contexto:\n{context}\n\nPergunta: {question}"
-            )
-        except RuntimeError as exc:
-            trace.append(TraceStep("generation", str(exc), ok=False))
-            raise
-        trace.append(
+        result.trace.append(
             TraceStep(
-                "generation",
-                f"provedor={resp.provider} modelo={resp.model} em {time.perf_counter() - t0:.2f}s",
+                "done",
+                f"concluído em {time.perf_counter() - t0:.2f}s, {result.iterations} iterações",
             )
         )
-        self._append_audit(question, sources, resp.provider, resp.model, time.perf_counter() - t0)
-
-        return AskResult(
-            answer=resp.text, sources=sources, provider=resp.provider, model=resp.model, trace=trace
+        self._append_audit(
+            question,
+            result.sources,
+            result.provider,
+            result.model,
+            elapsed=time.perf_counter() - t0,
+            iterations=result.iterations,
         )
+        return result
 
     # ----- Auditoria ------------------------------------------------------------
     def _append_audit(
-        self, question: str, sources: list[SearchHit], provider: str, model: str, elapsed: float
+        self,
+        question: str,
+        sources: list[SearchHit],
+        provider: str,
+        model: str,
+        elapsed: float,
+        iterations: int = 1,
     ) -> None:
         path = Path(self._settings.audit_log)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -113,6 +116,7 @@ class RAGEngine:
             "question": question,
             "provider": provider,
             "model": model,
+            "iterations": iterations,
             "elapsed_s": round(elapsed, 3),
             "sources": [{"doc": s.doc_name, "score": round(s.score, 4)} for s in sources],
         }

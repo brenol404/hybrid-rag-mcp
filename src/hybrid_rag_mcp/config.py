@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     bm25_top_k: int = 10
     rerank_model: str = ""
     rerank_budget: int = 20
+    ask_max_iterations: int = 2
 
 
 @lru_cache

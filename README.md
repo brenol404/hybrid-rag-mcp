@@ -16,7 +16,8 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 - **Fallback resiliente**: provedor de nuvem (OpenAI-compatible) na frente, **Ollama local como reserva** quando a API cai.
 - **Persistência**: os chunks ficam no Qdrant; o índice BM25 é **restaurado no startup** sem re-ingestão.
 - **Ingestão incremental**: re-rodar `ingest` só embeda o que mudou (idempotente por hash de conteúdo) e poda órfãos — barato em CI e em re-deploys.
-- **Rastreabilidade**: `trace` por passo do agente + `audit.jsonl` (pergunta, provedor, iterações, latência, fontes).
+- **Otimização de tokens**: **cache semântico** (JSONL + cosseno, com TTL) devolve respostas já geradas sem re-chamar o LLM; **compressor estilo-Caveman** (PT/EN) enxuga o contexto de fontes antes do prompt.
+- **Rastreabilidade**: `trace` por passo do agente + `audit.jsonl` (pergunta, provedor, iterações, latência, fontes, cache).
 - **Mensurável**: pipeline de avaliação `recall@k` / `nDCG@k` com **gate de qualidade no CI**.
 - **Dois transportes**: stdio (RPC local) e **streamable HTTP** (`http://host:port/mcp`).
 
@@ -51,6 +52,37 @@ Gatilho do CI: **falha se `recall@1 < 0.8`**.
 | 5  | **1.000** | 0.945 |
 
 Números honestos sobre texto real: a fonte certa está no top-1 em 91,7% dos casos e sempre no top-3. `tools/grid_search.py` varre pesos RRF/top_k e chega a esse resultado (peso léxico 1.5) — histórico em `eval/grid_results.json`. Rode localmente com `python -m hybrid_rag_mcp.eval`.
+
+## Otimização de contexto (cache + compressão)
+
+**Cache semântico** — antes de gerar, `ask` consulta `data/cache.jsonl` em duas camadas:
+1. *normalização exata* (perguntas idênticas, ignorando caixa/espaços) e
+2. *similaridade* — a pergunta é embedded (mesmo bge-m3 da busca) e comparada por
+   cosseno com as entradas; acima de `CACHE_SIM_THRESHOLD` (0.92) devolve a resposta
+   salva (TTL `CACHE_TTL_SEC`, limite `CACHE_MAX_ENTRIES`). Um hit pula a geração
+   inteira — é o maior corte de tokens. Hits são marcados `· cache` na resposta e
+   registrados no audit (`"cache": true`).
+
+**Compressão de contexto (estilo-Caveman)** — `CONTEXT_COMPRESSION` (0/1/2) remove
+palavras de função previsíveis (conectivos/enchimentos no nível 1; + artigos e
+auxiliares no nível 2) **apenas da cópia que vai para o prompt** do LLM: a busca, o
+re-ranking e as fontes exibidas continuam com o texto original, e números, nomes
+próprios e negações nunca são removidos. Determinística, multilíngue (PT/EN), zero
+dependências.
+
+```bash
+python tools/optimizers_report.py        # painel: cache + compressão + integrações avaliadas
+python tools/optimizers_report.py --json # mesma saída em JSON
+```
+
+**Integrações externas avaliadas — mantidas opcionais (nada entra no core):**
+
+| Ferramenta | Onde atuaria | Veredito |
+|---|---|---|
+| [Headroom](https://github.com/headroomlabs-ai/headroom) | compressão reversível de contexto/tool outputs/RAG chunks; lib Python + MCP server próprios | adotável futuramente como sidecar MCP; carga ONNX/HF (`pip install headroom`) |
+| [RTK](https://github.com/rtk-ai/rtk) | compressão de saída de shell para agentes de coding | fora do runtime — recomendado no ambiente de dev |
+| [Caveman](https://github.com/wilpel/caveman-compression) | princípio "tirar gramática, manter fatos" (PT incluso) | **já embutido** em `CONTEXT_COMPRESSION` |
+| [Ponytail](https://github.com/DietrichGebert/ponytail) | cortar volume de código gerado por agentes | não se aplica a um servidor RAG |
 
 ## Corpus
 
@@ -126,7 +158,7 @@ se a API falhar ou ficar offline.
 |---------|-----------|
 | `ingest` | Indexa `md`/`txt`/`pdf` de um diretório nos dois índices (Qdrant + BM25). Incremental: só re-embeda chunks alterados. |
 | `search` | Busca híbrida (RRF, com re-ranking opcional) retornando trechos + fontes. |
-| `ask`    | Agente multi-step: recupera, gera, detecta contexto insuficiente, refaz a busca e responde citando fontes (com audit log). |
+| `ask`    | Agente multi-step: recupera, gera, detecta contexto insuficiente, refaz a busca e responde citando fontes (com audit log). Consulta o **cache semântico** antes de gerar. |
 
 ## Estrutura
 
@@ -145,6 +177,9 @@ src/hybrid_rag_mcp/
 │   ├── embed.py       # Embeddings via Ollama
 │   ├── llm.py         # FallbackLLM (nuvem → Ollama)
 │   └── rerank.py      # Cross-encoder opcional (degradação graciosa)
+├── optimize/
+│   ├── cache.py       # Cache semântico (JSONL + cosseno + TTL)
+│   └── compress.py    # Compressor estilo-Caveman (PT/EN)
 └── stores/
     ├── vector.py      # Qdrant embarcado (sem Docker, persistente)
     └── lexic.py       # BM25 com idf suavizado
@@ -152,6 +187,6 @@ src/hybrid_rag_mcp/
 
 ## Qualidade
 
-- **21 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval e loop do agente.
+- **45 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico e compressor.
 - CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
 - `docker-compose.yml` intencionalmente ausente: roda só com `pip install` (Qdrant embarcado).

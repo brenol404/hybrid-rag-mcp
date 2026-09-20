@@ -1,0 +1,160 @@
+"""Cache semântico de respostas: evita regerar quando a pergunta já foi feita.
+
+Estratégia em duas camadas, persistida em JSONL (`data/cache.jsonl`):
+  1. Normalização exata — perguntas idênticas (ignorando caixa/whitespace) batem;
+  2. Semântica — a pergunta é embedded e comparada por cosseno com as entradas;
+     acima de `cache_sim_threshold` é devolvido o hit (TTL via `cache_ttl_sec`).
+Ao economizar uma geração inteira, o cache é o maior "otimizador de tokens".
+"""
+
+from __future__ import annotations
+
+import json
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..config import Settings
+from ..models import SearchHit
+from ..providers import EmbeddingProvider
+
+
+@dataclass(frozen=True)
+class CacheHit:
+    answer: str
+    provider: str
+    model: str
+    sources: list[SearchHit]
+    similarity: float
+
+
+class SemanticCache:
+    def __init__(self, settings: Settings, embedder: EmbeddingProvider) -> None:
+        self._path = Path(settings.cache_path)
+        self._embedder = embedder
+        self._threshold = settings.cache_sim_threshold
+        self._ttl = settings.cache_ttl_sec
+        self._max_entries = settings.cache_max_entries
+        self._lock = threading.Lock()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._entries = self._load()
+
+    # ---- Persistência -----------------------------------------------------
+    def _load(self) -> list[dict]:
+        entries: list[dict] = []
+        if not self._path.exists():
+            return entries
+        now = time.time()
+        with self._path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if now - entry["ts"] <= self._ttl:
+                    entries.append(entry)
+        return entries
+
+    def _flush(self) -> None:
+        with self._path.open("w", encoding="utf-8") as fh:
+            for entry in self._entries:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    # ---- Interface ----------------------------------------------------------
+    @staticmethod
+    def _normalize(question: str) -> str:
+        return " ".join(question.lower().split())
+
+    def lookup(self, question: str) -> CacheHit | None:
+        q = self._normalize(question)
+        now = time.time()
+        with self._lock:
+            for entry in self._entries:
+                if now - entry["ts"] > self._ttl:
+                    continue
+                if entry["q"] == q:
+                    return self._to_hit(entry, similarity=1.0)
+            query_vec = self._embedder.embed([q])[0]
+            best: dict | None = None
+            best_sim = 0.0
+            for entry in self._entries:
+                if now - entry["ts"] > self._ttl:
+                    continue
+                cos = _cosine(query_vec, entry["emb"])
+                if cos > best_sim:
+                    best_sim = cos
+                    best = entry
+            if best is not None and best_sim >= self._threshold:
+                return self._to_hit(best, similarity=best_sim)
+        return None
+
+    def store(
+        self,
+        question: str,
+        answer: str,
+        provider: str,
+        model: str,
+        sources: list[SearchHit],
+    ) -> None:
+        q = self._normalize(question)
+        entry = {
+            "q": q,
+            "emb": self._embedder.embed([q])[0],
+            "answer": answer,
+            "provider": provider,
+            "model": model,
+            "sources": [
+                {"doc": s.doc_name, "score": s.score, "content": s.content[:400]} for s in sources
+            ],
+            "ts": time.time(),
+        }
+        with self._lock:
+            self._entries = [e for e in self._entries if e["q"] != q]
+            self._entries.append(entry)
+            if len(self._entries) > self._max_entries:
+                self._entries = sorted(self._entries, key=lambda e: e["ts"])
+                self._entries = self._entries[-self._max_entries :]
+            self._flush()
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries = []
+            self._flush()
+
+    @property
+    def size(self) -> int:
+        return len(self._entries)
+
+    # ---- Helpers --------------------------------------------------------------
+    @staticmethod
+    def _to_hit(entry: dict, similarity: float) -> CacheHit:
+        sources = [
+            SearchHit(
+                chunk_id=f"cache-{i}",
+                doc_name=s["doc"],
+                content=s["content"],
+                score=float(s["score"]),
+                strategy="cache",
+            )
+            for i, s in enumerate(entry["sources"])
+        ]
+        return CacheHit(
+            answer=entry["answer"],
+            provider=entry["provider"],
+            model=entry["model"],
+            sources=sources,
+            similarity=similarity,
+        )
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(x * x for x in b) ** 0.5
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)

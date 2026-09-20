@@ -18,7 +18,7 @@ class SearchHit:
     doc_name: str
     content: str
     score: float
-    strategy: Literal["vector", "lexical", "hybrid"] = "hybrid"
+    strategy: Literal["vector", "lexical", "hybrid", "cache"] = "hybrid"
 
 
 @dataclass
@@ -38,3 +38,4 @@ class AskResult:
     model: str = ""
     trace: list[TraceStep] = field(default_factory=list)
     iterations: int = 1
+    cache_hit: bool = False

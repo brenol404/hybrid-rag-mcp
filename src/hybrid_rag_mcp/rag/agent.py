@@ -40,6 +40,23 @@ def format_context(hits: list[SearchHit]) -> str:
     return "\n\n".join(f"[{h.doc_name}] {h.content}" for h in hits)
 
 
+def _render_context(hits: list[SearchHit], compress: Callable[[str], str] | None) -> str:
+    """Formata o contexto; quando `compress` existe, comprime só a cópia do prompt."""
+    if compress is None:
+        return format_context(hits)
+    rendered = [
+        SearchHit(
+            chunk_id=h.chunk_id,
+            doc_name=h.doc_name,
+            content=compress(h.content),
+            score=h.score,
+            strategy=h.strategy,
+        )
+        for h in hits
+    ]
+    return format_context(rendered)
+
+
 def run_agent(
     question: str,
     retrieve: RetrieveFn,
@@ -49,6 +66,7 @@ def run_agent(
     on_event: Callable[[str], None] | None = None,
     on_tokens: Callable[[str], None] | None = None,
     generate_stream: StreamFn | None = None,
+    compress: Callable[[str], str] | None = None,
 ) -> AskResult:
     used: dict[str, SearchHit] = {}
     trace: list[TraceStep] = [TraceStep("ask", question)]
@@ -76,7 +94,7 @@ def run_agent(
         emit(f"iteração {iteration}: {len(new)} novos trechos, {len(used)} ao total")
 
         prompt = (
-            f"Contexto fornecido até agora:\n{format_context(list(used.values()))}\n\n"
+            f"Contexto fornecido até agora:\n{_render_context(list(used.values()), compress)}\n\n"
             f"Pergunta: {current_question}"
         )
         emit(f"iteração {iteration}: gerando resposta…")

@@ -89,7 +89,11 @@ async def ask(question: str, context: Context, top_k: int = 5) -> str:
 
     if error is not None:
         return f"Erro: {error}"
-    return f"[{result.provider}/{result.model}]\n{result.answer}\n\n--- Fontes ---\n{_format_hits(result.sources)}"
+    tag = " · cache" if result.cache_hit else ""
+    return (
+        f"[{result.provider}/{result.model}{tag}]\n{result.answer}\n\n--- Fontes ---\n"
+        f"{_format_hits(result.sources)}"
+    )
 
 
 def _ensure_engine() -> RAGEngine:

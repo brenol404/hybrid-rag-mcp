@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..config import Settings, get_settings
 from ..models import AskResult, SearchHit, TraceStep
+from ..optimize import SemanticCache, make_compressor
 from ..providers import FallbackLLM, resolve_embedder
 from ..providers.rerank import build_reranker
 from ..stores import LexicalStore, VectorStore
@@ -25,6 +26,8 @@ class RAGEngine:
         self._reranker = build_reranker(settings)
         self._llm = FallbackLLM(settings)
         self._restore_lexical()
+        self._cache = SemanticCache(settings, self._embedder) if settings.cache_enabled else None
+        self._compress = make_compressor(settings.context_compression)
 
     def _restore_lexical(self) -> None:
         """Persistência do BM25: reconstrói o índice léxico a partir dos chunks salvos no Qdrant."""
@@ -74,6 +77,38 @@ class RAGEngine:
         top_k = top_k or settings.top_k
         t0 = time.perf_counter()
 
+        cache_hit = None
+        if self._cache is not None:
+            cache_hit = self._cache.lookup(question)
+        if cache_hit is not None:
+            result = AskResult(
+                answer=cache_hit.answer,
+                sources=cache_hit.sources,
+                provider=cache_hit.provider,
+                model=cache_hit.model,
+                trace=[
+                    TraceStep(
+                        "cache",
+                        f"resposta do cache (similaridade={cache_hit.similarity:.3f})",
+                    )
+                ],
+                iterations=0,
+                cache_hit=True,
+            )
+            result.trace.append(
+                TraceStep("done", f"cache em {time.perf_counter() - t0:.2f}s, geração economizada")
+            )
+            self._append_audit(
+                question,
+                result.sources,
+                result.provider,
+                result.model,
+                elapsed=time.perf_counter() - t0,
+                iterations=0,
+                cached=True,
+            )
+            return result
+
         def retrieve(query: str, k: int) -> list[SearchHit]:
             return hybrid_search(
                 self._vector,
@@ -96,6 +131,7 @@ class RAGEngine:
             top_k=top_k,
             on_event=on_event,
             on_tokens=on_tokens,
+            compress=self._compress,
         )
         result.trace.append(
             TraceStep(
@@ -103,6 +139,18 @@ class RAGEngine:
                 f"concluído em {time.perf_counter() - t0:.2f}s, {result.iterations} iterações",
             )
         )
+        if self._compress is not None:
+            result.trace.append(
+                TraceStep(
+                    "compression",
+                    f"contexto comprimido (nível {settings.context_compression}) "
+                    "antes do prompt do LLM",
+                )
+            )
+        if self._cache is not None:
+            self._cache.store(
+                question, result.answer, result.provider, result.model, result.sources
+            )
         self._append_audit(
             question,
             result.sources,
@@ -122,6 +170,7 @@ class RAGEngine:
         model: str,
         elapsed: float,
         iterations: int = 1,
+        cached: bool = False,
     ) -> None:
         path = Path(self._settings.audit_log)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,6 +181,8 @@ class RAGEngine:
             "model": model,
             "iterations": iterations,
             "elapsed_s": round(elapsed, 3),
+            "cache": cached,
+            "compression": self._settings.context_compression,
             "sources": [{"doc": s.doc_name, "score": round(s.score, 4)} for s in sources],
         }
         with path.open("a", encoding="utf-8") as fh:

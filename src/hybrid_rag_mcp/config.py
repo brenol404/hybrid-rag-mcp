@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     audit_log: str = "data/audit.jsonl"
     qdrant_path: str = "data/qdrant"
 
+    cache_enabled: bool = True
+    cache_path: str = "data/cache.jsonl"
+    cache_sim_threshold: float = 0.92
+    cache_ttl_sec: int = 3600
+    cache_max_entries: int = 256
+
+    context_compression: int = 0
+
     chunk_size: int = 512
     chunk_overlap: int = 64
     top_k: int = 5

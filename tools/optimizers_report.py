@@ -88,15 +88,21 @@ def main() -> int:
     rt = rep["runtime"]
     print("== Otimizadores de tokens — runtime ==")
     sc = rt["semantic_cache"]
-    print(f"- Cache semântico: {sc['enabled']}  ({sc['path']}, sim>={sc['sim_threshold']}, ttl={sc['ttl_sec']}s)")
+    print(
+        f"- Cache semântico: {sc['enabled']}  ({sc['path']}, sim>={sc['sim_threshold']}, ttl={sc['ttl_sec']}s)"
+    )
     c = rt["context_compression"]
-    print(f"- Compressão de contexto: {c['level_name']} (nível {c['level']})  "
-          f"— amostra economiza {c['sample_savings'] * 100:.0f}% dos tokens")
+    print(
+        f"- Compressão de contexto: {c['level_name']} (nível {c['level']})  "
+        f"— amostra economiza {c['sample_savings'] * 100:.0f}% dos tokens"
+    )
     if c["level"]:
         print(f"    ex.: {c['sample_compressed']}")
     print("\n== Integrações externas avaliadas (futuro) ==")
     for item in rep["integrations_avaliadas"]:
-        print(f"- [{item['nome']}] {item['onde']}\n    status: {item['status']}\n    instalar: {item['instalar']}")
+        print(
+            f"- [{item['nome']}] {item['onde']}\n    status: {item['status']}\n    instalar: {item['instalar']}"
+        )
 
     print("\nPara ligar a compressão agora, configure CONTEXT_COMPRESSION=1|2 no .env.")
     return 0

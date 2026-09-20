@@ -25,19 +25,19 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 
 ```mermaid
 flowchart LR
-    C[Cliente MCP<br/>stdio ou HTTP] -->|tools: ingest / search / ask| M[MCP Server<br/>hybrid-rag-mcp]
-    M --> AGE[Agente multi-step<br/>loop com [MORE_CONTEXT]]
-    M --> I[ingest]
-    I --> C1[Chunker<br/>seções + sentenças]
-    C1 --> E[Embeddings<br/>Ollama bge-m3]
-    E --> Q1[(Qdrant local<br/>busca vetorial)]
-    C1 --> K[BM25 próprio<br/>busca léxica]
-    AGE --> RET[Busca híbrida]
+    C["Cliente MCP<br/>stdio ou HTTP"] -->|tools: ingest / search / ask| M["MCP Server<br/>hybrid-rag-mcp"]
+    M --> AGE["Agente multi-step<br/>loop com [MORE_CONTEXT]"]
+    M --> I["ingest"]
+    I --> C1["Chunker<br/>seções + sentenças"]
+    C1 --> E["Embeddings<br/>Ollama bge-m3"]
+    E --> Q1[("Qdrant local<br/>busca vetorial")]
+    C1 --> K["BM25 próprio<br/>busca léxica"]
+    AGE --> RET["Busca híbrida"]
     RET --> Q1 & K
-    Q1 & K --> RRF[RRF fusion]
-    RRF --> RR[Reranker opcional<br/>Ollama /api/rerank]
-    RR --> LLM[FallbackLLM<br/>nuvem -> Ollama]
-    LLM --> AUD[audit.jsonl<br/>trace + iterações + fontes]
+    Q1 & K --> RRF["RRF fusion"]
+    RRF --> RR["Reranker opcional<br/>Ollama /api/rerank"]
+    RR --> LLM["FallbackLLM<br/>nuvem -> Ollama"]
+    LLM --> AUD["audit.jsonl<br/>trace + iterações + fontes"]
 ```
 
 ## Métricas (gate de qualidade no CI)

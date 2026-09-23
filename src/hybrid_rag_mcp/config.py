@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     data_dir: str = "data"
     audit_log: str = "data/audit.jsonl"
     qdrant_path: str = "data/qdrant"
+    qdrant_url: str = ""  # ex.: http://localhost:6333 — se setado, usa servidor (multi-processo)
 
     cache_enabled: bool = True
     cache_path: str = "data/cache.jsonl"

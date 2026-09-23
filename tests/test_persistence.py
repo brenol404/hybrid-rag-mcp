@@ -185,3 +185,29 @@ def test_engine_warmup_restaura_lexico_para_uso_direto(tmp_path: Path, monkeypat
     hits = hybrid_search(fresh._vector, fresh._lexical, "cache redis", top_k=2, bm25_top_k=10)
     assert hits and hits[0].doc_name == "a.txt"
     fresh.close()  # fecha Qdrant + HTTP: não deve levantar
+
+
+def test_vector_store_escolhe_embarcado_ou_servidor(tmp_path: Path, monkeypatch) -> None:
+    """Contrato do modo servidor: QDRANT_URL setada → client por URL, senão por path.
+
+    Sem servidor de verdade (espiona o construtor). O modo embarcado continua
+    o default; o servidor desbloqueia multi-processo (sem lock de arquivo).
+    """
+    calls: list[tuple[tuple, dict]] = []
+
+    class _SpyClient:
+        def __init__(self, *args, **kwargs) -> None:
+            calls.append((args, kwargs))
+
+    monkeypatch.setattr("qdrant_client.QdrantClient", _SpyClient)
+
+    VectorStore(Settings(qdrant_path=str(tmp_path / "q1")), StubEmbedder())
+    assert calls[-1][1].get("path") == str(tmp_path / "q1")
+    assert "url" not in calls[-1][1]
+
+    VectorStore(
+        Settings(qdrant_path=str(tmp_path / "q2"), qdrant_url="http://localhost:6333"),
+        StubEmbedder(),
+    )
+    assert calls[-1][1].get("url") == "http://localhost:6333"
+    assert "path" not in calls[-1][1]

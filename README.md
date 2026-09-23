@@ -187,6 +187,8 @@ src/hybrid_rag_mcp/
 
 ## Qualidade
 
-- **56 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor e thread-safety do índice léxico.
+- **57 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor e thread-safety do índice léxico.
 - CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
-- `docker-compose.yml` intencionalmente ausente: roda só com `pip install` (Qdrant embarcado).
+- Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
+  **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para
+  sessões simultâneas — ver `docker-compose.yml`.

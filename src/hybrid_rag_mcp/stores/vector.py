@@ -18,9 +18,15 @@ class VectorStore:
     COLLECTION = "chunks"
 
     def __init__(self, settings: Settings, embedder: EmbeddingProvider) -> None:
-        path = Path(settings.qdrant_path)
-        path.mkdir(parents=True, exist_ok=True)
-        self._client = qdrant_client.QdrantClient(path=str(path))
+        if settings.qdrant_url:
+            # Modo servidor: índice compartilhado, vários processos/sessões
+            # simultâneas (ver docker-compose.yml). Sem lock de arquivo.
+            self._client = qdrant_client.QdrantClient(url=settings.qdrant_url)
+        else:
+            # Modo embarcado (default): sem Docker, um processo por vez.
+            path = Path(settings.qdrant_path)
+            path.mkdir(parents=True, exist_ok=True)
+            self._client = qdrant_client.QdrantClient(path=str(path))
         self._embedder = embedder
         # Nada consulta o embedder (nem o Ollama) aqui: a coleção e a dim só são
         # resolvidas no 1º uso (search/ingest). Construir o engine é barato.

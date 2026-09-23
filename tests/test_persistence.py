@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from hybrid_rag_mcp.config import Settings
+from hybrid_rag_mcp.rag import engine as engine_module
+from hybrid_rag_mcp.rag.engine import RAGEngine
 from hybrid_rag_mcp.rag.hybrid import hybrid_search
 from hybrid_rag_mcp.rag.ingestion import ingest_directory
 from hybrid_rag_mcp.stores.lexic import LexicalStore
@@ -152,3 +154,34 @@ def test_scroll_pagina_acima_do_batch(tmp_path: Path) -> None:
     assert again["unchanged"] == n
     assert len(vector.all_chunks()) == n
     vector.close()
+
+
+def test_engine_warmup_restaura_lexico_para_uso_direto(tmp_path: Path, monkeypatch) -> None:
+    """Contrato do init lazy: quem usa `rag._lexical` direto precisa de `warmup()`.
+
+    Regressão real: após a restauração do BM25 virar preguiçosa,
+    `tools/grid_search.py` lia o léxico vazio (0 chunks) e rodava o tuning
+    só no vetorial, em silêncio. Sem Ollama (embedder stub).
+    """
+    monkeypatch.setattr(engine_module, "resolve_embedder", lambda settings: StubEmbedder())
+    corpus, data = tmp_path / "corpus", tmp_path / "data"
+    corpus.mkdir()
+    _write_docs(corpus)
+    settings = Settings(
+        qdrant_path=str(data / "qdrant"),
+        corpus_dir=str(corpus),
+        cache_path=str(data / "cache.jsonl"),
+        audit_log=str(data / "audit.jsonl"),
+    )
+
+    first = RAGEngine(settings)
+    first.ingest(str(corpus))
+    first.close()
+
+    fresh = RAGEngine(settings)
+    assert len(fresh._lexical._chunks) == 0  # lazy: nada restaurado ainda
+    fresh.warmup()
+    assert len(fresh._lexical._chunks) > 0
+    hits = hybrid_search(fresh._vector, fresh._lexical, "cache redis", top_k=2, bm25_top_k=10)
+    assert hits and hits[0].doc_name == "a.txt"
+    fresh.close()  # fecha Qdrant + HTTP: não deve levantar

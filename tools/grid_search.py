@@ -84,6 +84,7 @@ def main() -> None:
     args = parser.parse_args()
 
     rag = RAGEngine(get_settings())
+    rag.warmup()  # restaura o BM25 persistido: os stores abaixo são usados direto
     cached = _CachedVector(rag._vector)
     dataset = load_datasets("eval/dataset.jsonl", "eval/dataset.real.jsonl")
 

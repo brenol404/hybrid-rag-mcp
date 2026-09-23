@@ -17,6 +17,9 @@ class Reranker:
         self._url = f"{settings.ollama_host.rstrip('/')}/api/rerank"
         self._http = httpx.Client(timeout=60)
 
+    def close(self) -> None:
+        self._http.close()
+
     def score(self, query: str, texts: list[str]) -> list[float]:
         if not self._model or not texts:
             return [0.0] * len(texts)

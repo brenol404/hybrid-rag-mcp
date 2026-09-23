@@ -4,16 +4,22 @@ com progress_callback, registrando as notificações recebidas em tempo real."""
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
+from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 async def main() -> None:
     server = StdioServerParameters(
-        command=".venv/bin/python",
+        command=sys.executable,
         args=["-m", "hybrid_rag_mcp"],
-        cwd="/home/lima/projects/hybrid-rag-mcp",
+        env={**os.environ, "PYTHONPATH": "src"},
+        cwd=str(ROOT),
     )
     events: list[dict] = []
 

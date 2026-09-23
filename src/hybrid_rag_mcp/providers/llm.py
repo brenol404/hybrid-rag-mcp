@@ -49,6 +49,9 @@ class CloudLLM(LLMProvider):
         self._model = settings.cloud_model
         self._http = httpx.Client(timeout=60)
 
+    def close(self) -> None:
+        self._http.close()
+
     def complete(self, system: str, user: str) -> LLMResponse:
         resp = self._http.post(
             f"{self._base_url}/chat/completions",
@@ -78,6 +81,13 @@ class FallbackLLM:
     @property
     def has_cloud(self) -> bool:
         return len(self._providers) > 1 and self._providers[0].provider_name == "cloud"
+
+    def close(self) -> None:
+        """Fecha os provedores que seguram recursos (ex.: httpx.Client da nuvem)."""
+        for provider in self._providers:
+            close = getattr(provider, "close", None)
+            if callable(close):
+                close()
 
     def complete(self, system: str, user: str) -> LLMResponse:
         errors: list[str] = []

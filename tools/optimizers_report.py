@@ -28,7 +28,7 @@ def _report() -> dict:
     compressor = make_compressor(s.context_compression)
     level_names = {0: "off", 1: "leve", 2: "agressivo"}
     sample = (
-        "O servidor usa Redis e Qdrant, porque ambos são locais e gratuitos. "
+        "O servidor usa Qdrant local e gratuito para a busca vetorial. "
         "A janela de manutenção é das 02h às 04h."
     )
     compressed = compressor(sample) if compressor else sample

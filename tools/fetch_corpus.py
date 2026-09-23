@@ -41,7 +41,6 @@ def fetch_book(slug: str, book_id: int, max_bytes: int, client: httpx.Client) ->
     if resp.status_code != 200:
         print(f"  ! {slug}: HTTP {resp.status_code} — pulando")
         return None
-    resp.raise_for_status()
     return resp.content[:max_bytes]
 
 

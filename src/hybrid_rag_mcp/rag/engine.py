@@ -41,6 +41,15 @@ class RAGEngine:
                     self._restore_lexical()
                     self._ready = True
 
+    def warmup(self) -> None:
+        """Restaura o índice léxico agora (sem buscar nada).
+
+        Necessário apenas para quem usa os stores internos (`_vector`,
+        `_lexical`) diretamente, sem passar por `search`/`ask`/`ingest` —
+        ex.: `tools/grid_search.py`. O caminho normal já restaura sozinho.
+        """
+        self._ensure_ready()
+
     def _restore_lexical(self) -> None:
         """Persistência do BM25: reconstrói o índice léxico a partir dos chunks salvos no Qdrant."""
         stored = self._vector.all_chunks()
@@ -48,8 +57,11 @@ class RAGEngine:
             self._lexical.upsert_chunks(stored)
 
     def close(self) -> None:
-        """Libera o lock do Qdrant local. Use entre instâncias no mesmo processo."""
+        """Libera recursos: lock do Qdrant local + clientes HTTP. Use entre instâncias no mesmo processo."""
         self._vector.close()
+        if self._reranker is not None:
+            self._reranker.close()
+        self._llm.close()
 
     # ----- Ingestão ----------------------------------------------------------
     def ingest(self, corpus_dir: str | None = None) -> dict[str, int]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from hybrid_rag_mcp.config import Settings
@@ -64,3 +65,47 @@ def test_settings_defaults() -> None:
     s = Settings()
     assert s.embed_model == "bge-m3"
     assert s.chunk_overlap < s.chunk_size
+
+
+def _mk_gen_chunks(gen: int, n: int) -> list[DocumentChunk]:
+    return [
+        DocumentChunk(f"c{gen}-{i}", f"doc-{gen}", f"chunk {i} da geração {gen}", i)
+        for i in range(n)
+    ]
+
+
+def test_lexical_store_seguro_sob_rebuild_concorrente() -> None:
+    """Rebuilds em paralelo com buscas nunca expõem mistura de versões.
+
+    No código antigo, `rebuild` trocava `_chunks` antes de reencher o modelo:
+    tamanhos alternados (60 -> 5) faziam leitores pegarem chunks novos (5) com
+    modelo antigo (60) e estourarem IndexError. Com o snapshot imutável, leitores
+    só veem pares (chunks, modelo) consistentes.
+    """
+    store = LexicalStore()
+    store.rebuild(_mk_gen_chunks(gen=0, n=5))
+    stop = threading.Event()
+    errors: list[Exception] = []
+
+    def searcher() -> None:
+        while not stop.is_set():
+            try:
+                hits = store.search("chunk geração", top_k=3)
+                assert all(h.doc_name.startswith("doc-") for h in hits)
+                assert all(h.content.startswith("chunk ") for h in hits)
+            except Exception as exc:  # noqa: BLE001 - registra qualquer falha e para
+                errors.append(exc)
+                stop.set()
+
+    threads = [threading.Thread(target=searcher) for _ in range(6)]
+    for t in threads:
+        t.start()
+    try:
+        sizes = (5, 60, 5, 60, 5, 60)  # alternar tamanhos expõe mismatch de índice
+        for gen in range(120):
+            store.rebuild(_mk_gen_chunks(gen, sizes[gen % len(sizes)]))
+    finally:
+        stop.set()
+        for t in threads:
+            t.join(timeout=10)
+    assert not errors, errors[:3]

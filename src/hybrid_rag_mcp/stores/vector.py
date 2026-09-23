@@ -31,6 +31,10 @@ class VectorStore:
                 vectors_config=qm.VectorParams(size=self._dim, distance=qm.Distance.COSINE),
             )
 
+    def _scroll_all_points(self) -> list:
+        """Lê todos os pontos da coleção com scroll paginado (Batch > página única)."""
+        return _scroll_all(self._client, self.COLLECTION)
+
     def upsert_chunks(self, chunks: list[DocumentChunk]) -> None:
         if not chunks:
             return
@@ -62,12 +66,7 @@ class VectorStore:
         added = unchanged = deleted = 0
         if chunks:
             target = {_hash_content(c.content) for c in chunks}
-            stored = self._client.scroll(
-                collection_name=self.COLLECTION,
-                limit=10000,
-                with_payload=True,
-                with_vectors=False,
-            )[0]
+            stored = self._scroll_all_points()
             present: set[int] = set()
             stale_ids: list[int] = []
             for p in stored:
@@ -111,12 +110,7 @@ class VectorStore:
 
     def all_chunks(self) -> list[DocumentChunk]:
         """Recarrega todos os chunks persistidos (base da persistência do BM25)."""
-        points = self._client.scroll(
-            collection_name=self.COLLECTION,
-            limit=10000,
-            with_payload=True,
-            with_vectors=False,
-        )[0]
+        points = self._scroll_all_points()
         return [
             DocumentChunk(
                 chunk_id=p.payload["chunk_id"],
@@ -142,3 +136,28 @@ def _hash_content(text: str) -> int:
     return int.from_bytes(
         hashlib.blake2b(normalized.encode("utf-8"), digest_size=16).digest(), "big"
     )
+
+
+_SCROLL_BATCH = 1000
+
+
+def _scroll_all(client: qdrant_client.QdrantClient, collection_name: str) -> list:
+    """Scroll paginado: itera todas as páginas da coleção (offset até None).
+
+    `scroll` sem offset retorna apenas a primeira página (limit fixo); acima do
+    batch os chunks simplesmente sumiam do sync/persistência. Aqui seguimos o
+    `next_page_offset` até esgotar.
+    """
+    points: list = []
+    offset = None
+    while True:
+        page, offset = client.scroll(
+            collection_name=collection_name,
+            limit=_SCROLL_BATCH,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        points.extend(page)
+        if offset is None:
+            return points

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from dataclasses import dataclass
 
 from ..models import DocumentChunk, SearchHit
 
@@ -93,36 +94,63 @@ class BM25:
         return scores
 
 
+@dataclass(frozen=True)
+class _LexicalSnapshot:
+    """Estado imutável do índice léxico: (chunks, modelo) sempre juntos.
+
+    `rebuild` monta o novo modelo em variável local e troca o snapshot inteiro
+    num único assignment — atômico sob GIL — de modo que nenhuma leitura
+    concorrente vê uma mistura de versões (chunks novos + modelo antigo e
+    vice-versa).
+    """
+
+    chunks: tuple[tuple[str, str, str], ...]
+    model: BM25
+
+
 class LexicalStore:
-    """Busca léxica BM25 em memória, sem dependências externas."""
+    """Busca léxica BM25 em memória, sem dependências externas.
+
+    Thread-safe para leituras concorrentes: leitores seguram uma referência ao
+    snapshot (`_snapshot`) — sempre consistente — enquanto `rebuild`/`upsert`
+    preparam a nova versão fora do estado publicado.
+    """
 
     def __init__(self) -> None:
-        self._chunks: list[tuple[str, str, str]] = []  # (chunk_id, doc_name, text)
-        self._model = BM25()
+        self._snapshot = _LexicalSnapshot((), BM25())
+
+    @property
+    def _chunks(self) -> list[tuple[str, str, str]]:
+        """Compat com inspeção/tests: expõe o estado atual como lista."""
+        return list(self._snapshot.chunks)
 
     def upsert_chunks(self, chunks: list[DocumentChunk]) -> None:
+        snap = self._snapshot
         self.rebuild(
             [
                 DocumentChunk(chunk_id=cid, doc_name=doc, content=text, index=0)
-                for cid, doc, text in list(self._chunks)
+                for cid, doc, text in list(snap.chunks)
                 + [(c.chunk_id, c.doc_name, c.content) for c in chunks]
             ]
         )
 
     def rebuild(self, chunks: list[DocumentChunk]) -> None:
-        self._chunks = [(c.chunk_id, c.doc_name, c.content) for c in chunks]
-        self._model.fit([_tokenize(c.content) for c in chunks])
+        stored = tuple((c.chunk_id, c.doc_name, c.content) for c in chunks)
+        model = BM25()
+        model.fit([_tokenize(c.content) for c in chunks])
+        self._snapshot = _LexicalSnapshot(stored, model)
 
     def search(self, query: str, top_k: int) -> list[SearchHit]:
-        if not self._chunks:
+        snap = self._snapshot
+        if not snap.chunks:
             return []
-        scores = self._model.score_all(_tokenize(query))
+        scores = snap.model.score_all(_tokenize(query))
         ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
         return [
             SearchHit(
-                chunk_id=self._chunks[i][0],
-                doc_name=self._chunks[i][1],
-                content=self._chunks[i][2],
+                chunk_id=snap.chunks[i][0],
+                doc_name=snap.chunks[i][1],
+                content=snap.chunks[i][2],
                 score=float(scores[i]),
                 strategy="lexical",
             )

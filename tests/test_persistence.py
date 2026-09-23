@@ -123,3 +123,32 @@ def test_ingest_remove_doc_poda_orfao(tmp_path: Path) -> None:
     assert "b.txt" not in staying
     assert "a.txt" in staying
     vector.close()
+
+
+def test_scroll_pagina_acima_do_batch(tmp_path: Path) -> None:
+    """Corpora maiores que o batch de scroll (1000) não perdem chunks.
+
+    O `scroll` sem offset devolve só a primeira página; o helper `_scroll_all`
+    segue o `next_page_offset` até esgotar. Aqui forçamos >1 página e re-rodamos
+    o sync para provar que nada some.
+    """
+    corpus, data = tmp_path / "corpus", tmp_path / "data"
+    corpus.mkdir()
+    for k in range(18):
+        sentences = " ".join(f"frase {i} do tema {k} com token unico {k}-{i}." for i in range(800))
+        (corpus / f"doc-{k}.txt").write_text(f"# Tema {k}\n{sentences}", encoding="utf-8")
+    settings = Settings(qdrant_path=str(data / "qdrant"), corpus_dir=str(corpus))
+    vector = VectorStore(settings, StubEmbedder())
+    lexical = LexicalStore()
+    stats = ingest_directory(str(corpus), settings, vector, lexical, StubEmbedder())
+    n = stats["chunks"]
+    assert n > 1000, f"esperado corpus > 1000 chunks para paginar, veio {n}"
+
+    assert len(vector.all_chunks()) == n
+
+    again = ingest_directory(str(corpus), settings, vector, lexical, StubEmbedder())
+    assert again["added"] == 0
+    assert again["deleted"] == 0
+    assert again["unchanged"] == n
+    assert len(vector.all_chunks()) == n
+    vector.close()

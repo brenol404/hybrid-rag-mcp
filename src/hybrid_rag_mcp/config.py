@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     rerank_budget: int = 20
     ask_max_iterations: int = 2
 
+    mcp_auth_token: str = ""  # se setado, o transporte HTTP exige `Authorization: Bearer`
+
 
 @lru_cache
 def get_settings() -> Settings:

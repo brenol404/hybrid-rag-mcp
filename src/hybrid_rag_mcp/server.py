@@ -3,12 +3,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import queue
+import secrets
 import threading
 from pathlib import Path
 
 from mcp.server.mcpserver import Context, MCPServer
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .rag.engine import RAGEngine
 
 mcp = MCPServer(
@@ -135,6 +138,41 @@ def _format_hits(hits) -> str:
     return "\n".join(lines)
 
 
+class _BearerAuthMiddleware(BaseHTTPMiddleware):
+    """Exige `Authorization: Bearer <token>` em todo o HTTP quando configurado.
+
+    Sem token configurado o middleware nem entra na pilha (comportamento
+    idêntico ao `run_streamable_http_async` do SDK). Comparação em tempo
+    constante contra timing attack.
+    """
+
+    def __init__(self, app, token: str) -> None:
+        super().__init__(app)
+        self._token = token
+
+    async def dispatch(self, request, call_next):
+        auth = request.headers.get("authorization", "")
+        if not secrets.compare_digest(auth, f"Bearer {self._token}"):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
+
+
+def _build_http_app(settings: Settings):
+    """Monta o app streamable HTTP do SDK, com auth opcional por bearer token."""
+    app = mcp.streamable_http_app()
+    if settings.mcp_auth_token:
+        app.add_middleware(_BearerAuthMiddleware, token=settings.mcp_auth_token)
+    return app
+
+
+async def _run_http(host: str, port: int) -> None:
+    import uvicorn
+
+    app = _build_http_app(get_settings())
+    config = uvicorn.Config(app, host=host, port=port, log_level=mcp.settings.log_level.lower())
+    await uvicorn.Server(config).serve()
+
+
 def main() -> None:
     """Ponto de entrada da CLI: serve o MCP via stdio (padrão) ou streamable HTTP."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -149,7 +187,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.transport == "http":
-        asyncio.run(mcp.run_streamable_http_async(host=args.host, port=args.port))
+        asyncio.run(_run_http(args.host, args.port))
     else:
         asyncio.run(mcp.run_stdio_async())
 

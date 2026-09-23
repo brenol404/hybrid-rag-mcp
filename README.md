@@ -146,6 +146,15 @@ python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000
 python examples/client_http.py "Qual a porta padrão?"
 ```
 
+**Auth no HTTP (recomendado ao expor na rede):** gere um token
+(`openssl rand -hex 32`), exporte `MCP_AUTH_TOKEN` no servidor **e** no
+cliente — sem o header `Authorization: Bearer` o servidor responde 401.
+Sem token configurado, comporta-se como antes (só use em localhost).
+
+```
+MCP_AUTH_TOKEN=... python -m hybrid_rag_mcp --transport http --port 8000
+MCP_AUTH_TOKEN=... python examples/client_http.py "Qual a porta padrão?"
+
 Registre em qualquer cliente MCP (Claude Desktop, editores, agentes):
 
 ```json
@@ -202,7 +211,7 @@ src/hybrid_rag_mcp/
 
 ## Qualidade
 
-- **62 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico e parsing/agregação do juiz.
+- **65 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz e auth HTTP.
 - CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

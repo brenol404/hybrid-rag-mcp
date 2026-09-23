@@ -7,20 +7,29 @@
     python examples/client_http.py "Qual a porta padrão do servidor?"
 
 URL padrão: http://127.0.0.1:8000/mcp
+
+Com auth ligada no servidor (MCP_AUTH_TOKEN), exporte o mesmo token:
+    MCP_AUTH_TOKEN=... python examples/client_http.py "pergunta"
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 
+import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 
 async def run(question: str, url: str) -> None:
+    headers = {}
+    if os.environ.get("MCP_AUTH_TOKEN"):
+        headers["Authorization"] = f"Bearer {os.environ['MCP_AUTH_TOKEN']}"
+    client = httpx.AsyncClient(headers=headers, timeout=60)
     async with (
-        streamable_http_client(url) as (read, write),
+        streamable_http_client(url, http_client=client) as (read, write),
         ClientSession(read, write) as session,
     ):
         await session.initialize()

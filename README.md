@@ -53,6 +53,20 @@ Gatilho do CI: **falha se `recall@1 < 0.8`**.
 
 Números honestos sobre texto real: a fonte certa está no top-1 em 91,7% dos casos e sempre no top-3. `tools/grid_search.py` varre pesos RRF/top_k e chega a esse resultado (peso léxico 1.5) — histórico em `eval/grid_results.json`. Rode localmente com `python -m hybrid_rag_mcp.eval`.
 
+## Qualidade das respostas (llm-as-judge)
+
+Retrieval prova que o trecho certo sobe; isto prova que a resposta final está
+correta: **12 perguntas** sobre o corpus (`eval/answers.jsonl`), cada uma com
+resposta esperada, nota **0/1/2** dada pelo próprio Ollama — rode com
+`python -m hybrid_rag_mcp.judge` (precisa do Ollama de pé).
+
+| métrica | valor |
+|---|---|
+| média | **1.92** (0..2) |
+| nota 2 | 11/12 |
+| nota 1 | 1/12 (ans-06: faltou "telemetria não vai ao PostgreSQL") |
+| nota 0 / sem veredito | 0 |
+
 ## Otimização de contexto (cache + compressão)
 
 **Cache semântico** — antes de gerar, `ask` consulta `data/cache.jsonl` em duas camadas:
@@ -167,6 +181,7 @@ src/hybrid_rag_mcp/
 ├── server.py          # Servidor MCP (stdio + streamable HTTP)
 ├── config.py          # Configuração via .env (pydantic-settings)
 ├── eval.py            # Avaliação recall@k / nDCG@k
+├── judge.py           # Avaliação de respostas via llm-as-judge (NOTA 0/1/2)
 ├── rag/
 │   ├── agent.py       # Loop multi-step (memória de fontes, [MORE_CONTEXT])
 │   ├── chunker.py     # Chunking por seções markdown + sentenças
@@ -187,7 +202,7 @@ src/hybrid_rag_mcp/
 
 ## Qualidade
 
-- **57 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor e thread-safety do índice léxico.
+- **62 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico e parsing/agregação do juiz.
 - CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

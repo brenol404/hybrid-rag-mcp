@@ -1,0 +1,12 @@
+{"expected": "8443", "id": "ans-01", "question": "Qual a porta padrão do servidor Pqpbr?"}
+{"expected": "Backups incrementais a cada 4 horas.", "id": "ans-02", "question": "De quantas em quantas horas são executados os backups incrementais?"}
+{"expected": "Entre 02h e 04h, horário de Brasília.", "id": "ans-03", "question": "Qual a janela de manutenção recomendada?"}
+{"expected": "Menos de 300 milissegundos.", "id": "ans-04", "question": "Se o nó primário falhar, em quanto tempo um novo primário é eleito?"}
+{"expected": "ClickHouse.", "id": "ans-05", "question": "Qual o banco analítico principal para armazenar telemetria?"}
+{"expected": "Dados transacionais: usuários, permissões e configuração. Telemetria não vai para o PostgreSQL.", "id": "ans-06", "question": "Para que o PostgreSQL é reservado?"}
+{"expected": "Janela deslizante de 60 segundos.", "id": "ans-07", "question": "Qual a janela do rate limit por chave no Redis?"}
+{"expected": "Três partições por tópico e retenção de 30 dias.", "id": "ans-08", "question": "Quantas partições por tópico o Kafka usa e qual a retenção das mensagens?"}
+{"expected": "A cada 5 segundos.", "id": "ans-09", "question": "De quanto em quanto tempo os consumidores gravam mini-batches no ClickHouse?"}
+{"expected": "Tokens JWT de curta duração que expiram em 10 minutos.", "id": "ans-10", "question": "Como funciona a autenticação das requisições?"}
+{"expected": "O papel operador só tem leitura de telemetria; admin tem escrita e reconfiguração.", "id": "ans-11", "question": "O que o papel operador pode fazer?"}
+{"expected": "6 meses.", "id": "ans-12", "question": "Por quanto tempo os registros de auditoria são retidos?"}

@@ -32,6 +32,7 @@ class RAGEngine:
         # não toca em Ollama nem no Qdrant.
         self._ready = False
         self._ready_lock = threading.Lock()
+        self._audit_lock = threading.Lock()
 
     def _ensure_ready(self) -> None:
         """Reconstrói o índice léxico a partir dos chunks persistidos, sob demanda."""
@@ -202,16 +203,38 @@ class RAGEngine:
     ) -> None:
         path = Path(self._settings.audit_log)
         path.parent.mkdir(parents=True, exist_ok=True)
-        record = {
-            "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "question": question,
-            "provider": provider,
-            "model": model,
-            "iterations": iterations,
-            "elapsed_s": round(elapsed, 3),
-            "cache": cached,
-            "compression": self._settings.context_compression,
-            "sources": [{"doc": s.doc_name, "score": round(s.score, 4)} for s in sources],
-        }
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        with self._audit_lock:
+            self._rotate_audit(path)
+            record = {
+                "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                "question": question,
+                "provider": provider,
+                "model": model,
+                "iterations": iterations,
+                "elapsed_s": round(elapsed, 3),
+                "cache": cached,
+                "compression": self._settings.context_compression,
+                "sources": [{"doc": s.doc_name, "score": round(s.score, 4)} for s in sources],
+            }
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    def _rotate_audit(self, path: Path) -> None:
+        """Rotaciona o audit log por tamanho: atual vira .1, .1 vira .2, ... (mantém `audit_keep`)."""
+        max_bytes = self._settings.audit_max_bytes
+        if max_bytes <= 0:
+            return
+        try:
+            if path.stat().st_size < max_bytes:
+                return
+        except FileNotFoundError:
+            return
+        keep = max(1, self._settings.audit_keep)
+        oldest = path.with_name(f"{path.name}.{keep}")
+        if oldest.exists():
+            oldest.unlink()
+        for i in range(keep - 1, 0, -1):
+            src = path.with_name(f"{path.name}.{i}")
+            if src.exists():
+                src.rename(path.with_name(f"{path.name}.{i + 1}"))
+        path.rename(path.with_name(f"{path.name}.1"))

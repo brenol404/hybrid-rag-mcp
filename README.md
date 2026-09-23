@@ -175,6 +175,23 @@ Copie `.env.example` para `.env` e preencha `CLOUD_BASE_URL` + `CLOUD_API_KEY` +
 (qualquer endpoint OpenAI-compatível). A nuvem assume prioridade; o Ollama responde automaticamente
 se a API falhar ou ficar offline.
 
+## Deploy
+
+**systemd (bare metal):** `deploy/hybrid-rag.service` é uma user unit que sobe o
+transporte HTTP em `127.0.0.1:8000` com restart automático — ajuste os caminhos
+(`%h` = seu home) e instale com
+`systemctl --user enable --now` apontando para o arquivo. O `.env` é opcional
+(nuvem/token só se você exportar).
+
+**Docker (Qdrant + RAG):** `docker compose up -d --build` sobe o Qdrant e o
+servidor já apontado para ele (`QDRANT_URL=http://qdrant:6333`, Ollama via
+`host.docker.internal`). Sem Docker instalado aqui o compose não foi executado
+localmente — validado por inspeção; o CI continua cobrindo o modo embarcado.
+
+**Higiene de dados:** o `audit.jsonl` rotaciona por tamanho
+(`AUDIT_MAX_BYTES`, default 5MB, mantém `AUDIT_KEEP=3` backups); o cache
+semântico já é limitado (`CACHE_MAX_ENTRIES`).
+
 ## Ferramentas MCP
 
 | Tool    | Descrição |
@@ -211,7 +228,7 @@ src/hybrid_rag_mcp/
 
 ## Qualidade
 
-- **65 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz e auth HTTP.
+- **66 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP e rotação do audit.
 - CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

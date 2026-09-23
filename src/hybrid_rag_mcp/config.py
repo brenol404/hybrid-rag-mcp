@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     corpus_dir: str = "examples/corpus"
     data_dir: str = "data"
     audit_log: str = "data/audit.jsonl"
+    audit_max_bytes: int = 5_000_000  # rotaciona o audit.jsonl ao passar disso (0 = sem rotação)
+    audit_keep: int = 3  # quantos backups (audit.jsonl.1, .2, ...) manter
     qdrant_path: str = "data/qdrant"
     qdrant_url: str = ""  # ex.: http://localhost:6333 — se setado, usa servidor (multi-processo)
 

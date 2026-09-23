@@ -19,5 +19,20 @@ services:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
 
+  # Servidor RAG (HTTP) apontando para o Qdrant acima e o Ollama do host.
+  # MCP_AUTH_TOKEN e CLOUD_* vêm do ambiente (exporte antes do compose up).
+  rag:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      OLLAMA_HOST: http://host.docker.internal:11434
+      QDRANT_URL: http://qdrant:6333
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
 volumes:
   qdrant_data:

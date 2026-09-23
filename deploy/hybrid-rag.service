@@ -1,0 +1,16 @@
+[Unit]
+Description=hybrid-rag-mcp (servidor MCP de RAG hibrido local)
+After=network.target
+
+[Service]
+Type=simple
+# %h = home do usuário — ajuste se o checkout estiver noutro lugar.
+WorkingDirectory=%h/projects/hybrid-rag-mcp
+# O traço inicial torna o .env opcional (vale também sem nuvem/token).
+EnvironmentFile=-%h/projects/hybrid-rag-mcp/.env
+ExecStart=%h/projects/hybrid-rag-mcp/.venv/bin/python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

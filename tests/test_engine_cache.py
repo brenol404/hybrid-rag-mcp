@@ -166,3 +166,20 @@ def test_engine_init_nao_consulta_embedder(tmp_path: Path, monkeypatch) -> None:
 
     RAGEngine(_settings(tmp_path))
     assert counter.calls == 0
+
+
+def test_audit_rotaciona_por_tamanho(tmp_path: Path, monkeypatch) -> None:
+    """Higiene de dados: audit.jsonl não cresce sem limite (rotação .1, .2, ...)."""
+    _patch(monkeypatch)
+    eng = RAGEngine(_settings(tmp_path, cache_enabled=False, audit_max_bytes=400, audit_keep=2))
+    for i in range(6):
+        eng.ask(f"pergunta numero {i} sobre a janela de manutencao?")
+    audit = tmp_path / "audit.jsonl"
+    assert (tmp_path / "audit.jsonl.1").exists()
+    assert audit.exists()
+    # nada se perde: atual + backups somam as 6 linhas
+    total = 0
+    for f in (audit, tmp_path / "audit.jsonl.1", tmp_path / "audit.jsonl.2"):
+        if f.exists():
+            total += len(f.read_text(encoding="utf-8").strip().splitlines())
+    assert total == 6

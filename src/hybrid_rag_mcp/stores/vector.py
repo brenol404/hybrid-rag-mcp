@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from pathlib import Path
 
 import qdrant_client
@@ -21,15 +22,21 @@ class VectorStore:
         path.mkdir(parents=True, exist_ok=True)
         self._client = qdrant_client.QdrantClient(path=str(path))
         self._embedder = embedder
-        self._dim = embedder.dim
-        self._ensure_collection()
+        # Nada consulta o embedder (nem o Ollama) aqui: a coleção e a dim só são
+        # resolvidas no 1º uso (search/ingest). Construir o engine é barato.
+        self._collection_lock = threading.Lock()
+
+    @property
+    def _dim(self) -> int:
+        return self._embedder.dim
 
     def _ensure_collection(self) -> None:
-        if not self._client.collection_exists(self.COLLECTION):
-            self._client.create_collection(
-                collection_name=self.COLLECTION,
-                vectors_config=qm.VectorParams(size=self._dim, distance=qm.Distance.COSINE),
-            )
+        with self._collection_lock:
+            if not self._client.collection_exists(self.COLLECTION):
+                self._client.create_collection(
+                    collection_name=self.COLLECTION,
+                    vectors_config=qm.VectorParams(size=self._dim, distance=qm.Distance.COSINE),
+                )
 
     def _scroll_all_points(self) -> list:
         """Lê todos os pontos da coleção com scroll paginado (Batch > página única)."""
@@ -38,6 +45,7 @@ class VectorStore:
     def upsert_chunks(self, chunks: list[DocumentChunk]) -> None:
         if not chunks:
             return
+        self._ensure_collection()
         vectors = self._embedder.embed([c.content for c in chunks])
         self._client.upsert(
             collection_name=self.COLLECTION,
@@ -65,6 +73,7 @@ class VectorStore:
         """
         added = unchanged = deleted = 0
         if chunks:
+            self._ensure_collection()
             target = {_hash_content(c.content) for c in chunks}
             stored = self._scroll_all_points()
             present: set[int] = set()
@@ -90,6 +99,7 @@ class VectorStore:
         return {"added": added, "deleted": deleted, "unchanged": unchanged}
 
     def search(self, query: str, top_k: int) -> list[SearchHit]:
+        self._ensure_collection()
         query_vector = self._embedder.embed([query])[0]
         hits = self._client.query_points(
             collection_name=self.COLLECTION,
@@ -110,6 +120,8 @@ class VectorStore:
 
     def all_chunks(self) -> list[DocumentChunk]:
         """Recarrega todos os chunks persistidos (base da persistência do BM25)."""
+        if not self._client.collection_exists(self.COLLECTION):
+            return []  # nada indexado ainda — não cria a coleção nem consulta embedder
         points = self._scroll_all_points()
         return [
             DocumentChunk(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -25,9 +26,20 @@ class RAGEngine:
         self._lexical = LexicalStore()
         self._reranker = build_reranker(settings)
         self._llm = FallbackLLM(settings)
-        self._restore_lexical()
         self._cache = SemanticCache(settings, self._embedder) if settings.cache_enabled else None
         self._compress = make_compressor(settings.context_compression)
+        # Restauração do BM25 é preguiçosa (1º search/ask): construir o engine
+        # não toca em Ollama nem no Qdrant.
+        self._ready = False
+        self._ready_lock = threading.Lock()
+
+    def _ensure_ready(self) -> None:
+        """Reconstrói o índice léxico a partir dos chunks persistidos, sob demanda."""
+        if not self._ready:
+            with self._ready_lock:
+                if not self._ready:
+                    self._restore_lexical()
+                    self._ready = True
 
     def _restore_lexical(self) -> None:
         """Persistência do BM25: reconstrói o índice léxico a partir dos chunks salvos no Qdrant."""
@@ -52,6 +64,7 @@ class RAGEngine:
 
     # ----- Busca --------------------------------------------------------------
     def search(self, query: str, top_k: int | None = None) -> list[SearchHit]:
+        self._ensure_ready()
         top_k = top_k or self._settings.top_k
         return hybrid_search(
             self._vector,
@@ -108,6 +121,9 @@ class RAGEngine:
                 cached=True,
             )
             return result
+
+        # Cache miss: agora sim restaura o índice léxico (1ª vez) e recupera.
+        self._ensure_ready()
 
         def retrieve(query: str, k: int) -> list[SearchHit]:
             return hybrid_search(

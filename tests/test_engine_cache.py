@@ -142,3 +142,27 @@ def test_engine_aplica_compressao_e_preserva_fontes(tmp_path: Path, monkeypatch)
     assert "02h às 04h" in eng._llm.last_user
     # fontes preservam o texto original, sem compactação
     assert "A janela de manutenção é das 02h às 04h." == result.sources[0].content
+
+
+def test_engine_init_nao_consulta_embedder(tmp_path: Path, monkeypatch) -> None:
+    """Construir o RAGEngine não toca no Ollama/Qdrant: dim é preguiçosa.
+
+    Com o VectorStore REAL (Qdrant local), o construtor não deve chamar
+    `embed` nem criar a coleção — isso fica para o primeiro search/ingest.
+    """
+
+    class _CountingEmbed(_FakeEmbed):
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def embed(self, texts: list[str]) -> list[list[float]]:
+            self.calls += 1
+            return super().embed(texts)
+
+    counter = _CountingEmbed()
+    monkeypatch.setattr(engine_module, "resolve_embedder", lambda settings: counter)
+    monkeypatch.setattr(engine_module, "build_reranker", lambda settings: None)
+    monkeypatch.setattr(engine_module, "FallbackLLM", _FakeLLM)
+
+    RAGEngine(_settings(tmp_path))
+    assert counter.calls == 0

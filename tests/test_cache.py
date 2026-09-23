@@ -114,3 +114,29 @@ def test_clear_empties(cache: SemanticCache) -> None:
     cache.clear()
     assert cache.size == 0
     assert cache.lookup("x") is None
+
+
+def test_append_log_compacta_e_nao_cresce_sem_limite(tmp_path: Path) -> None:
+    cache = SemanticCache(_settings(tmp_path, cache_max_entries=10), FakeEmbed())
+    for i in range(130):
+        cache.store(f"pergunta {i}", f"resposta {i}", "ollama", "qwen3", _sources())
+    assert cache.size == 10
+    # append-log: só a compactação (a cada 64 gravações) reescreve o arquivo
+    lines = len((tmp_path / "cache.jsonl").read_text(encoding="utf-8").splitlines())
+    assert lines <= 10 + SemanticCache._COMPACT_EVERY - 1
+    assert cache.lookup("pergunta 129") is not None
+    # reload: read da memória pós-compactação, consistente com o disco
+    reloaded = SemanticCache(_settings(tmp_path, cache_max_entries=10), FakeEmbed())
+    assert reloaded.size == 10
+    assert reloaded.lookup("pergunta 129") is not None
+
+
+def test_reload_fica_com_a_resposta_mais_recente_da_mesma_pergunta(
+    tmp_path: Path,
+) -> None:
+    cache = SemanticCache(_settings(tmp_path), FakeEmbed())
+    cache.store("mesma pergunta", "resposta antiga", "ollama", "qwen3", _sources())
+    cache.store("mesma pergunta", "resposta nova", "ollama", "qwen3", _sources())
+    reloaded = SemanticCache(_settings(tmp_path), FakeEmbed())
+    hit = reloaded.lookup("mesma pergunta")
+    assert hit is not None and hit.answer == "resposta nova"

@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import queue
 import threading
+from pathlib import Path
 
 from mcp.server.mcpserver import Context, MCPServer
 
@@ -14,6 +15,28 @@ mcp = MCPServer(
     "hybrid-rag-mcp",
     instructions="Busca híbrida + RAG local sobre documentos técnicos com fallback offline.",
 )
+
+_MAX_TOP_K = 50
+_DEFAULT_TOP_K = 5
+
+
+def _clamp_top_k(top_k: int | None, default: int = _DEFAULT_TOP_K) -> int:
+    """Limita `top_k` ao intervalo [1, _MAX_TOP_K].
+
+    Valores absurdos vindos da rede não devem chegar ao Qdrant (negativo
+    quebra a query; gigante pesa/estoura a busca).
+    """
+    if top_k is None:
+        return default
+    return max(1, min(int(top_k), _MAX_TOP_K))
+
+
+def _resolve_corpus_dir(corpus_dir: str, default_dir: str) -> str:
+    """Valida o diretório apontado por `ingest` antes de tocar no engine."""
+    directory = corpus_dir or default_dir
+    if not Path(directory).is_dir():
+        raise ValueError(f"Diretório de corpus não encontrado ou não é um diretório: {directory}")
+    return directory
 
 
 class _Runtime:
@@ -26,7 +49,7 @@ class _Runtime:
 def ingest(corpus_dir: str = "") -> str:
     """Indexa documentos (md/txt/pdf) de um diretório nos índices vetorial e BM25."""
     engine = _ensure_engine()
-    directory = corpus_dir or get_settings().corpus_dir
+    directory = _resolve_corpus_dir(corpus_dir, get_settings().corpus_dir)
     stats = engine.ingest(directory)
     return (
         f"Indexado: {stats['documents']} documentos, {stats['chunks']} chunks "
@@ -39,7 +62,7 @@ def ingest(corpus_dir: str = "") -> str:
 def search(query: str, top_k: int = 5) -> str:
     """Busca híbrida (vetorial + BM25 via RRF) no corpus indexado. Retorna trechos e fontes."""
     engine = _ensure_engine()
-    hits = engine.search(query, top_k=top_k)
+    hits = engine.search(query, top_k=_clamp_top_k(top_k))
     if not hits:
         return "Nenhum resultado encontrado. Execute 'ingest' antes."
     return _format_hits(hits)
@@ -59,7 +82,9 @@ async def ask(question: str, context: Context, top_k: int = 5) -> str:
 
     def runner() -> None:
         try:
-            result = engine.ask(question, top_k=top_k, on_event=emit, on_tokens=on_token)
+            result = engine.ask(
+                question, top_k=_clamp_top_k(top_k), on_event=emit, on_tokens=on_token
+            )
             channel.put(("result", result))
         except Exception as exc:  # noqa: BLE001 - resposta de erro volta como texto
             channel.put(("error", str(exc)))

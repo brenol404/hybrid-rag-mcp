@@ -82,7 +82,6 @@ def main() -> None:
         # Higiene de memória: o corpus em Python serviu ao ingest; a fase de
         # busca segura só o índice (crucial em máquinas pequenas — o OOM killer
         # já levou um run de 128k chunks aqui antes desta linha existir).
-        n_chunks = len(chunks)
         del chunks, by_doc
         gc.collect()
 
@@ -106,9 +105,9 @@ def main() -> None:
         rag.close()
 
     report = {
-        "chunks": n_chunks,
+        "chunks": stats["indexed"],
         "ingest_s": round(ingest_s, 1),
-        "ingest_chunks_per_s": round(n_chunks / ingest_s, 1),
+        "ingest_chunks_per_s": round(stats["indexed"] / ingest_s, 1),
         "index_disk_mb": round(disk, 1),
         "latency_ms_single": {k: round(v, 1) for k, v in lat1.items()},
         "latency_ms_concurrent": {k: round(v, 1) for k, v in latN.items()},

@@ -54,7 +54,6 @@ Gatilho do CI: **falha se `recall@1 < 0.8`**.
 Números honestos sobre texto real: a fonte certa está no top-1 em 91,7% dos casos e sempre no top-3. `tools/grid_search.py` varre pesos RRF/top_k e chega a esse resultado (peso léxico 1.5) — histórico em `eval/grid_results.json`. Rode localmente com `python -m hybrid_rag_mcp.eval`.
 
 ## Qualidade das respostas (llm-as-judge)
-
 Retrieval prova que o trecho certo sobe; isto prova que a resposta final está
 correta: **12 perguntas** sobre o corpus (`eval/answers.jsonl`), cada uma com
 resposta esperada, nota **0/1/2** dada pelo próprio Ollama — rode com
@@ -66,6 +65,26 @@ resposta esperada, nota **0/1/2** dada pelo próprio Ollama — rode com
 | nota 2 | 11/12 |
 | nota 1 | 1/12 (ans-06: faltou "telemetria não vai ao PostgreSQL") |
 | nota 0 / sem veredito | 0 |
+
+## Escala (retrieval, modo embarcado)
+
+Metodologia (`tools/scale_bench.py`): 11 docs reais replicados com salt único
+até ~25k chunks — recall continua no eval curado, aqui só **latência,
+throughput e disco** (36 queries reais, sem LLM). Índice isolado, Qdrant
+embarcado numa máquina de 4GB RAM.
+
+| métrica | 32.760 chunks indexados |
+|---|---|
+| ingest | 566s (**58 chunks/s**), índice 337MB em disco |
+| busca 1 thread | p50 269ms · p95 663ms · média 404ms |
+| busca 8 threads | p50 1313ms · p95 2334ms |
+| p99 single 4,4s | custo one-time de warmup (1ª busca restaura o BM25) |
+
+Leituras honestas: o gargalo em escala é o **BM25 em Python puro** (varre todos
+os docs por query) e a contenção sob concorrência (~5x com 8 threads — GIL +
+Qdrant local + embedding no Ollama). Teto conhecido: com 128k chunks a máquina
+tomou OOM — acima de ~100k chunks ou pouca RAM, usar o modo servidor
+(`QDRANT_URL`, ver Deploy).
 
 ## Otimização de contexto (cache + compressão)
 

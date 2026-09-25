@@ -3,10 +3,29 @@
 [![CI](https://github.com/brenol404/hybrid-rag-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/brenol404/hybrid-rag-mcp/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/brenol404/hybrid-rag-mcp)](https://github.com/brenol404/hybrid-rag-mcp/releases)
 
 > Serve MCP com **RAG híbrido** (Qdrant vetorial + BM25 léxico via RRF), **agente multi-step** com fallback offline via **Ollama** e transporte **stdio** ou **streamable HTTP**.
 
-Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas com **fontes citadas**, de forma **100% local** — o padrão que conecta LLMs a bases locais/corporativas em 2026/2027.
+Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas com **fontes citadas**, de forma **100% local**, sem enviar documentos para terceiros.
+
+> **Prova:** recall@1 **0.917** · juiz de respostas **1.92/2** · **80 testes** · mypy strict · CI com gates de qualidade.
+
+## Índice
+
+- [Destaques](#destaques)
+- [Arquitetura](#arquitetura)
+- [Métricas](#métricas-gate-de-qualidade-no-ci)
+- [Qualidade das respostas](#qualidade-das-respostas-llm-as-judge)
+- [Escala](#escala-retrieval-modo-embarcado)
+- [Otimização de contexto](#otimização-de-contexto-cache--compressão)
+- [Corpus](#corpus)
+- [Como rodar](#como-rodar)
+- [Deploy](#deploy)
+- [Observabilidade](#observabilidade)
+- [Ferramentas MCP](#ferramentas-mcp)
+- [Estrutura](#estrutura)
+- [Qualidade](#qualidade)
 
 ## Destaques
 
@@ -14,7 +33,7 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 - **Agente multi-step**: se o contexto da 1ª busca for insuficiente, o modelo sinaliza `[MORE_CONTEXT]`, o agente gera uma busca de follow-up e repete com **memória incremental de fontes**.
 - **Re-ranking opcional**: cross-encoder (Ollama `/api/rerank`, ex. `bge-reranker-v2-m3`) com *degradação graciosa*.
 - **Fallback resiliente**: provedor de nuvem (OpenAI-compatible) na frente, **Ollama local como reserva** quando a API cai.
-- **Persistência**: os chunks ficam no Qdrant; o índice BM25 é **restaurado no startup** sem re-ingestão.
+- **Persistência**: os chunks ficam no Qdrant; o índice BM25 é **restaurado sob demanda** (primeira busca) sem re-ingestão.
 - **Ingestão incremental**: re-rodar `ingest` só embeda o que mudou (idempotente por hash de conteúdo) e poda órfãos — barato em CI e em re-deploys.
 - **Otimização de tokens**: **cache semântico** (JSONL + cosseno, com TTL) devolve respostas já geradas sem re-chamar o LLM; **compressor estilo-Caveman** (PT/EN) enxuga o contexto de fontes antes do prompt.
 - **Rastreabilidade**: `trace` por passo do agente + `audit.jsonl` (pergunta, provedor, iterações, latência, fontes, cache).
@@ -25,7 +44,7 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 
 ```mermaid
 flowchart LR
-    C["Cliente MCP<br/>stdio ou HTTP"] -->|tools: ingest / search / ask| M["MCP Server<br/>hybrid-rag-mcp"]
+    C["Cliente MCP<br/>stdio ou HTTP"] -->|tools: ingest / search / ask / metrics| M["MCP Server<br/>hybrid-rag-mcp"]
     M --> AGE["Agente multi-step<br/>loop com [MORE_CONTEXT]"]
     M --> I["ingest"]
     I --> C1["Chunker<br/>seções + sentenças"]
@@ -181,6 +200,7 @@ Sem token configurado, comporta-se como antes (só use em localhost).
 ```
 MCP_AUTH_TOKEN=... python -m hybrid_rag_mcp --transport http --port 8000
 MCP_AUTH_TOKEN=... python examples/client_http.py "Qual a porta padrão?"
+```
 
 Registre em qualquer cliente MCP (Claude Desktop, editores, agentes):
 
@@ -255,6 +275,8 @@ src/hybrid_rag_mcp/
 ├── config.py          # Configuração via .env (pydantic-settings)
 ├── eval.py            # Avaliação recall@k / nDCG@k
 ├── judge.py           # Avaliação de respostas via llm-as-judge (NOTA 0/1/2)
+├── bench.py           # Blocos do bench de escala (percentis, corpus sintético)
+├── metrics.py         # Métricas em processo (contadores + p50/p95, Prometheus)
 ├── rag/
 │   ├── agent.py       # Loop multi-step (memória de fontes, [MORE_CONTEXT])
 │   ├── chunker.py     # Chunking por seções markdown + sentenças
@@ -280,7 +302,7 @@ Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 ## Qualidade
 
 - **80 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit e observabilidade.
-- CI em 3 frentes: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
+- CI em 2 jobs: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para
   sessões simultâneas — ver `docker-compose.yml`.

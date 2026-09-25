@@ -18,9 +18,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from .config import get_settings
+from .models import AskResult
+from .providers.base import LLMResponse
 from .rag.engine import RAGEngine
 
 JUDGE_SYSTEM = (
@@ -54,13 +58,13 @@ class JudgeReport:
 
     def mean_score(self) -> float:
         s = self.scored()
-        return sum(v.score for v in s) / len(s) if s else 0.0
+        return sum(v.score for v in s if v.score is not None) / len(s) if s else 0.0
 
     def count(self, score: int | None) -> int:
         return sum(1 for v in self.verdicts if v.score == score)
 
 
-def load_answers(path: str) -> list[dict]:
+def load_answers(path: str) -> list[dict[str, Any]]:
     with open(path, encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
 
@@ -78,14 +82,20 @@ def parse_verdict(text: str) -> tuple[int | None, str]:
     return int(m.group(1)), justification
 
 
-def judge_one(question: str, expected: str, answer: str, judge_fn) -> tuple[int | None, str]:
+def judge_one(
+    question: str, expected: str, answer: str, judge_fn: Callable[[str, str], LLMResponse]
+) -> tuple[int | None, str]:
     user = f"PERGUNTA: {question}\nRESPOSTA ESPERADA: {expected}\nRESPOSTA: {answer}"
     resp = judge_fn(JUDGE_SYSTEM, user)
     text = resp.text if hasattr(resp, "text") else str(resp)
     return parse_verdict(text)
 
 
-def run_eval(items: list[dict], ask_fn, judge_fn) -> JudgeReport:
+def run_eval(
+    items: list[dict[str, Any]],
+    ask_fn: Callable[[str], AskResult],
+    judge_fn: Callable[[str, str], LLMResponse],
+) -> JudgeReport:
     report = JudgeReport()
     for item in items:
         try:

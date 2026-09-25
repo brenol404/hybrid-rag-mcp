@@ -5,13 +5,18 @@ import asyncio
 import queue
 import secrets
 import threading
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from mcp.server.mcpserver import Context, MCPServer
+from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp
 
 from .config import Settings, get_settings
+from .models import AskResult, SearchHit
 from .rag.engine import RAGEngine
 
 mcp = MCPServer(
@@ -75,7 +80,7 @@ def search(query: str, top_k: int = 5) -> str:
 async def ask(question: str, context: Context, top_k: int = 5) -> str:
     """Responde com RAG e faz streaming do progresso/tokens via progress notifications."""
     engine = _ensure_engine()
-    channel: queue.Queue = queue.Queue()
+    channel: queue.Queue[tuple[str, str | AskResult]] = queue.Queue()
 
     def emit(event: str) -> None:
         channel.put(("event", event))
@@ -95,8 +100,8 @@ async def ask(question: str, context: Context, top_k: int = 5) -> str:
     thread = threading.Thread(target=runner, daemon=True)
     thread.start()
 
-    result = None
-    error = None
+    result: AskResult | None = None
+    error: str | None = None
     token_count = 0
     while True:
         try:
@@ -106,17 +111,22 @@ async def ask(question: str, context: Context, top_k: int = 5) -> str:
                 break
             continue
         if kind == "event":
+            assert isinstance(payload, str)
             await context.report_progress(0, None, payload)
         elif kind == "token":
+            assert isinstance(payload, str)
             token_count += 1
             await context.report_progress(token_count, None, payload)
         elif kind == "result":
+            assert isinstance(payload, AskResult)
             result = payload
         elif kind == "error":
+            assert isinstance(payload, str)
             error = payload
 
     if error is not None:
         return f"Erro: {error}"
+    assert result is not None  # runner sempre entrega result ou error
     tag = " · cache" if result.cache_hit else ""
     return (
         f"[{result.provider}/{result.model}{tag}]\n{result.answer}\n\n--- Fontes ---\n"
@@ -130,7 +140,7 @@ def _ensure_engine() -> RAGEngine:
     return _Runtime.engine
 
 
-def _format_hits(hits) -> str:
+def _format_hits(hits: list[SearchHit]) -> str:
     lines = []
     for i, h in enumerate(hits, start=1):
         preview = h.content[:160].replace("\n", " ")
@@ -146,20 +156,24 @@ class _BearerAuthMiddleware(BaseHTTPMiddleware):
     constante contra timing attack.
     """
 
-    def __init__(self, app, token: str) -> None:
+    def __init__(self, app: ASGIApp, token: str) -> None:
         super().__init__(app)
         self._token = token
 
-    async def dispatch(self, request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         auth = request.headers.get("authorization", "")
         if not secrets.compare_digest(auth, f"Bearer {self._token}"):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         return await call_next(request)
 
 
-def _build_http_app(settings: Settings):
+def _build_http_app(settings: Settings) -> Starlette:
     """Monta o app streamable HTTP do SDK, com auth opcional por bearer token."""
     app = mcp.streamable_http_app()
+    # O SDK não é tipado (retorno Any): checagem em runtime, não cast cego.
+    assert isinstance(app, Starlette)
     if settings.mcp_auth_token:
         app.add_middleware(_BearerAuthMiddleware, token=settings.mcp_auth_token)
     return app

@@ -65,7 +65,7 @@ class RAGEngine:
         self._llm.close()
 
     # ----- Ingestão ----------------------------------------------------------
-    def ingest(self, corpus_dir: str | None = None) -> dict[str, int]:
+    def ingest(self, corpus_dir: str | None = None) -> dict[str, int | dict[str, int]]:
         dir_to_scan = corpus_dir or self._settings.corpus_dir
         return ingest_directory(
             dir_to_scan,

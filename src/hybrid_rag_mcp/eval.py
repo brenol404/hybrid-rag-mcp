@@ -12,6 +12,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .config import get_settings
 from .rag.engine import RAGEngine
@@ -45,14 +46,14 @@ class EvalReport:
         return sum(vals) / len(vals) if vals else 0.0
 
 
-def load_dataset(path: str) -> list[dict]:
+def load_dataset(path: str) -> list[dict[str, Any]]:
     with open(path, encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
 
 
-def load_datasets(*paths: str) -> list[dict]:
+def load_datasets(*paths: str) -> list[dict[str, Any]]:
     """Carrega, em ordem, todos os datasets existentes; ignora os ausentes."""
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for path in paths:
         if Path(path).exists():
             rows.extend(load_dataset(path))
@@ -79,7 +80,7 @@ def recall_at_k(rel: list[float], relevant_total: int, k: int) -> float:
 
 def evaluate(
     engine: RAGEngine,
-    dataset: list[dict],
+    dataset: list[dict[str, Any]],
     ks: tuple[int, ...] = (1, 3, 5),
 ) -> EvalReport:
     report = EvalReport(ks=ks)

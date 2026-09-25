@@ -117,15 +117,23 @@ ollama pull bge-reranker-v2-m3   # opcional: somente Ollama >= 0.36
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# 3. Indexar + responder (uso direto da engine)
-python -c "
-from hybrid_rag_mcp.rag.engine import RAGEngine
-rag = RAGEngine()
-print(rag.ingest())                                    # indexa examples/corpus
-print(rag.search('Qual a porta padrão do servidor?'))  # busca híbrida
-print(rag.ask('De quantas em quantas horas são os backups?'))  # agente com fontes
-"
+# 3. Demo de ~1 min (ingest + search + ask)
+bash examples/demo.sh
 ```
+
+<details>
+<summary>Saída real da demo (Ollama local, corpus de exemplo)</summary>
+
+```
+[ingest] 11 docs, 1964 chunks (+0 novos, 1964 no índice)
+[search] 'Qual a porta padrão do servidor?'
+  - [pqpbr-operations.txt] score=0.065: ## Configuração de Rede O servidor escuta na porta 8443...
+[ask] 'De quantas em quantas horas são os backups?'
+  [ollama/qwen3:8b] Os backups incrementais são executados a cada 4 horas [pqpbr-operations.txt].
+  fontes: gutenberg-dom-casmurro.txt, pqpbr-operations.txt
+```
+
+</details>
 
 ### Como cliente MCP
 
@@ -204,7 +212,7 @@ semântico já é limitado (`CACHE_MAX_ENTRIES`).
 
 ```
 src/hybrid_rag_mcp/
-├── server.py          # Servidor MCP (stdio + streamable HTTP)
+├── server.py          # Servidor MCP (stdio + streamable HTTP, auth bearer opcional)
 ├── config.py          # Configuração via .env (pydantic-settings)
 ├── eval.py            # Avaliação recall@k / nDCG@k
 ├── judge.py           # Avaliação de respostas via llm-as-judge (NOTA 0/1/2)
@@ -226,10 +234,14 @@ src/hybrid_rag_mcp/
     └── lexic.py       # BM25 com idf suavizado
 ```
 
+Decisões de arquitetura com contexto e evidência: [`docs/adr/`](docs/adr/)
+(RRF, storage, cache, juiz, lazy-init). Guia de contribuição: [CONTRIBUTING.md](CONTRIBUTING.md).
+Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
+
 ## Qualidade
 
 - **66 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP e rotação do audit.
-- CI em 2 jobs: `test` (ruff + pytest + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`).
+- CI em 3 frentes: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para
   sessões simultâneas — ver `docker-compose.yml`.

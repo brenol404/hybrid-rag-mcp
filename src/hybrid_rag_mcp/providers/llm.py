@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 
 from ..config import Settings
 from .base import LLMProvider, LLMResponse
@@ -24,7 +25,7 @@ class OllamaLLM(LLMProvider):
             text=resp["message"]["content"], provider=self.provider_name, model=self._model
         )
 
-    def complete_stream(self, system: str, user: str):
+    def complete_stream(self, system: str, user: str) -> Iterator[LLMResponse]:
         resp = self._client.chat(
             model=self._model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -99,7 +100,7 @@ class FallbackLLM:
                 time.sleep(0.2)
         raise RuntimeError(f"Todos os provedores de LLM falharam: {'; '.join(errors)}")
 
-    def complete_stream(self, system: str, user: str):
+    def complete_stream(self, system: str, user: str) -> Iterator[LLMResponse]:
         """Streaming com fallback entre provedores: o primeiro que emitir vence."""
         errors: list[str] = []
         for provider in self._providers:

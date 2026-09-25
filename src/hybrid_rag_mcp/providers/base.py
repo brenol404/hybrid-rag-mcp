@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 
@@ -29,7 +30,7 @@ class LLMProvider(ABC):
     def complete(self, system: str, user: str) -> LLMResponse:
         """Gera uma resposta. Levanta exceção se indisponível."""
 
-    def complete_stream(self, system: str, user: str):
+    def complete_stream(self, system: str, user: str) -> Iterator[LLMResponse]:
         """Gera a resposta em chunks (tokens/trechos). Default: não-streaming."""
         resp = self.complete(system, user)
         yield resp

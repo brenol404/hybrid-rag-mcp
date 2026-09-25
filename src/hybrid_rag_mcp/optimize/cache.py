@@ -18,6 +18,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from ..config import Settings
 from ..models import SearchHit
@@ -48,8 +49,8 @@ class SemanticCache:
         self._entries = self._load()
 
     # ---- Persistência -----------------------------------------------------
-    def _load(self) -> list[dict]:
-        entries: dict[str, dict] = {}
+    def _load(self) -> list[dict[str, Any]]:
+        entries: dict[str, dict[str, Any]] = {}
         if not self._path.exists():
             return []
         now = time.time()
@@ -75,7 +76,7 @@ class SemanticCache:
             for entry in self._entries:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    def _append_entry(self, entry: dict) -> None:
+    def _append_entry(self, entry: dict[str, Any]) -> None:
         """Append-log: uma linha nova sem reescrever o arquivo (O(1) de I/O)."""
         with self._path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -95,7 +96,7 @@ class SemanticCache:
                 if entry["q"] == q:
                     return self._to_hit(entry, similarity=1.0)
             query_vec = self._embedder.embed([q])[0]
-            best: dict | None = None
+            best: dict[str, Any] | None = None
             best_sim = 0.0
             for entry in self._entries:
                 if now - entry["ts"] > self._ttl:
@@ -117,7 +118,7 @@ class SemanticCache:
         sources: list[SearchHit],
     ) -> None:
         q = self._normalize(question)
-        entry = {
+        entry: dict[str, Any] = {
             "q": q,
             "emb": self._embedder.embed([q])[0],
             "answer": answer,
@@ -153,7 +154,7 @@ class SemanticCache:
 
     # ---- Helpers --------------------------------------------------------------
     @staticmethod
-    def _to_hit(entry: dict, similarity: float) -> CacheHit:
+    def _to_hit(entry: dict[str, Any], similarity: float) -> CacheHit:
         sources = [
             SearchHit(
                 chunk_id=f"cache-{i}",
@@ -174,9 +175,9 @@ class SemanticCache:
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    na = sum(x * x for x in a) ** 0.5
-    nb = sum(x * x for x in b) ** 0.5
+    dot: float = sum(x * y for x, y in zip(a, b, strict=True))
+    na: float = sum(x * x for x in a) ** 0.5
+    nb: float = sum(x * x for x in b) ** 0.5
     if na == 0 or nb == 0:
         return 0.0
     return dot / (na * nb)

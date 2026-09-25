@@ -26,8 +26,18 @@ jobs:
           pip install ruff
           ruff check . && ruff format --check .
 
-      - name: Unit tests
-        run: pytest -q
+      - name: Type check (mypy strict)
+        run: |
+          pip install mypy
+          mypy src
+
+      - name: Unit tests (coverage gate >= 75%)
+        run: pytest -q --cov --cov-report=term --cov-fail-under=75
+
+      - name: Security audit (pip-audit)
+        run: |
+          pip install pip-audit
+          pip-audit
 
       - name: Import smoke test (MCP server registra tools sem discar para Ollama)
         run: |

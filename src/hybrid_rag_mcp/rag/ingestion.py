@@ -29,7 +29,7 @@ def ingest_directory(
     embedder: EmbeddingProvider,
     chunk_size: int | None = None,
     overlap: int | None = None,
-) -> dict[str, int]:
+) -> dict[str, int | dict[str, int]]:
     """Indexa todos os documentos suportados do diretório nos dois índices."""
     root = Path(corpus_dir)
     if not root.exists():
@@ -37,7 +37,7 @@ def ingest_directory(
 
     chunk_size = chunk_size or settings.chunk_size
     overlap = overlap or settings.chunk_overlap
-    stats: dict[str, int] = {}
+    per_doc: dict[str, int] = {}
     total_chunks: list[DocumentChunk] = []
 
     for path in sorted(root.rglob("*")):
@@ -46,7 +46,7 @@ def ingest_directory(
         text = read_document(path)
         chunks = chunk_text(path.name, text, chunk_size=chunk_size, overlap=overlap)
         total_chunks.extend(chunks)
-        stats[path.name] = len(chunks)
+        per_doc[path.name] = len(chunks)
 
     # Sincronização incremental: embed somente chunks novos, poda órfãos.
     sync = vector_store.sync_chunks(total_chunks)
@@ -54,11 +54,11 @@ def ingest_directory(
     lexical_store.rebuild(stored)
 
     return {
-        "documents": len(stats),
+        "documents": len(per_doc),
         "chunks": len(total_chunks),
         "added": sync["added"],
         "deleted": sync["deleted"],
         "unchanged": sync["unchanged"],
         "indexed": len(stored),
-        "per_doc": stats,
+        "per_doc": per_doc,
     }

@@ -9,6 +9,12 @@ Metodologia honesta, leia antes de citar os números:
   - As queries são as 36 reais do eval; o LLM fica de fora (ask não roda) —
     é bench do retrieval, que é o nosso código.
   - O índice vai para data/scale-bench/qdrant (NUNCA no data/qdrant real).
+  - Detalhe: o bench escreve os chunks em arquivos e re-ingere, então o
+    re-chunking infla a contagem (~28% a mais que o alvo) — o report usa o
+    número real indexado, não o alvo.
+  - Embarcado em máquina pequena (<8GB RAM) tem teto: um run de 128k chunks
+    tomou OOM do SO na fase de busca. Acima de ~100k chunks ou pouca RAM,
+    use o modo servidor (QDRANT_URL).
 
 Uso:
     python tools/scale_bench.py --chunks 100000
@@ -18,6 +24,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import tempfile
 import time
@@ -72,6 +79,12 @@ def main() -> None:
             f"Ingest: {stats['indexed']} no índice em {ingest_s:.1f}s "
             f"({stats['indexed'] / ingest_s:.0f} chunks/s)"
         )
+        # Higiene de memória: o corpus em Python serviu ao ingest; a fase de
+        # busca segura só o índice (crucial em máquinas pequenas — o OOM killer
+        # já levou um run de 128k chunks aqui antes desta linha existir).
+        n_chunks = len(chunks)
+        del chunks, by_doc
+        gc.collect()
 
         queries = [
             q["query"] for q in load_datasets("eval/dataset.jsonl", "eval/dataset.real.jsonl")
@@ -93,9 +106,9 @@ def main() -> None:
         rag.close()
 
     report = {
-        "chunks": len(chunks),
+        "chunks": n_chunks,
         "ingest_s": round(ingest_s, 1),
-        "ingest_chunks_per_s": round(len(chunks) / ingest_s, 1),
+        "ingest_chunks_per_s": round(n_chunks / ingest_s, 1),
         "index_disk_mb": round(disk, 1),
         "latency_ms_single": {k: round(v, 1) for k, v in lat1.items()},
         "latency_ms_concurrent": {k: round(v, 1) for k, v in latN.items()},

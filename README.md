@@ -219,6 +219,25 @@ localmente — validado por inspeção; o CI continua cobrindo o modo embarcado.
 (`AUDIT_MAX_BYTES`, default 5MB, mantém `AUDIT_KEEP=3` backups); o cache
 semântico já é limitado (`CACHE_MAX_ENTRIES`).
 
+## Observabilidade
+
+Métricas em processo, zero dependências (`src/hybrid_rag_mcp/metrics.py`):
+contadores (`search_total`, `ask_total`, `ask_cache_hits`, `*_errors`,
+`ask_provider_<nome>`) + latências (`search_ms`, `ask_ms`, `ingest_ms`).
+
+- **HTTP:** `GET /metrics` em formato Prometheus (herda o bearer auth).
+  Exemplo de scrape:
+  ```yaml
+  scrape_configs:
+    - job_name: hybrid-rag
+      static_configs: [{targets: ["127.0.0.1:8000"]}]
+      # authorization: {credentials: <MCP_AUTH_TOKEN>}  # se auth ligada
+  ```
+- **Ambos os transportes:** tool MCP `metrics` com resumo humano.
+- **Logs:** uma linha JSON por `search`/`ask` no stderr
+  (`{"op": "ask", "elapsed_ms": 123.4, "cache_hit": false, ...}`) — o stdout
+  pertence ao protocolo MCP no modo stdio e nunca é poluído.
+
 ## Ferramentas MCP
 
 | Tool    | Descrição |
@@ -226,6 +245,7 @@ semântico já é limitado (`CACHE_MAX_ENTRIES`).
 | `ingest` | Indexa `md`/`txt`/`pdf` de um diretório nos dois índices (Qdrant + BM25). Incremental: só re-embeda chunks alterados. |
 | `search` | Busca híbrida (RRF, com re-ranking opcional) retornando trechos + fontes. |
 | `ask`    | Agente multi-step: recupera, gera, detecta contexto insuficiente, refaz a busca e responde citando fontes (com audit log). Consulta o **cache semântico** antes de gerar. |
+| `metrics` | Resumo das métricas do servidor (contadores + latências p50/p95 desde o boot). |
 
 ## Estrutura
 
@@ -259,7 +279,7 @@ Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade
 
-- **66 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP e rotação do audit.
+- **80 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit e observabilidade.
 - CI em 3 frentes: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

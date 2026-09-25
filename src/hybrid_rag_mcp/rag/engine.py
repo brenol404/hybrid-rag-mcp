@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
 
 from ..config import Settings, get_settings
+from ..metrics import Metrics
 from ..models import AskResult, SearchHit, TraceStep
 from ..optimize import SemanticCache, make_compressor
 from ..providers import FallbackLLM, resolve_embedder
@@ -21,6 +23,8 @@ class RAGEngine:
     def __init__(self, settings: Settings | None = None) -> None:
         settings = settings or get_settings()
         self._settings = settings
+        self.metrics = Metrics()
+        self._log = logging.getLogger("hybrid_rag_mcp.engine")
         self._embedder = resolve_embedder(settings)
         self._vector = VectorStore(settings, self._embedder)
         self._lexical = LexicalStore()
@@ -79,17 +83,37 @@ class RAGEngine:
     def search(self, query: str, top_k: int | None = None) -> list[SearchHit]:
         self._ensure_ready()
         top_k = top_k or self._settings.top_k
-        return hybrid_search(
-            self._vector,
-            self._lexical,
-            query,
-            top_k=top_k,
-            bm25_top_k=self._settings.bm25_top_k,
-            reranker=self._reranker,
-            rerank_budget=self._settings.rerank_budget,
-            rrf_k=self._settings.rrf_k,
-            rrf_weights=(self._settings.rrf_w_vector, self._settings.rrf_w_lexical),
+        t0 = time.perf_counter()
+        try:
+            hits = hybrid_search(
+                self._vector,
+                self._lexical,
+                query,
+                top_k=top_k,
+                bm25_top_k=self._settings.bm25_top_k,
+                reranker=self._reranker,
+                rerank_budget=self._settings.rerank_budget,
+                rrf_k=self._settings.rrf_k,
+                rrf_weights=(self._settings.rrf_w_vector, self._settings.rrf_w_lexical),
+            )
+        except Exception as exc:
+            self.metrics.inc("search_errors")
+            self._log.warning(json.dumps({"op": "search", "error": str(exc)}))
+            raise
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        self.metrics.inc("search_total")
+        self.metrics.observe("search_ms", elapsed_ms)
+        self._log.info(
+            json.dumps(
+                {
+                    "op": "search",
+                    "elapsed_ms": round(elapsed_ms, 1),
+                    "top_k": top_k,
+                    "hits": len(hits),
+                }
+            )
         )
+        return hits
 
     # ----- Geração com rastreabilidade (agente multi-step) --------------------
     def ask(
@@ -133,6 +157,21 @@ class RAGEngine:
                 iterations=0,
                 cached=True,
             )
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            self.metrics.inc("ask_total")
+            self.metrics.inc("ask_cache_hits")
+            self.metrics.observe("ask_ms", elapsed_ms)
+            self._log.info(
+                json.dumps(
+                    {
+                        "op": "ask",
+                        "elapsed_ms": round(elapsed_ms, 1),
+                        "cache_hit": True,
+                        "provider": result.provider,
+                        "iterations": 0,
+                    }
+                )
+            )
             return result
 
         # Cache miss: agora sim restaura o índice léxico (1ª vez) e recupera.
@@ -151,16 +190,38 @@ class RAGEngine:
                 rrf_weights=(settings.rrf_w_vector, settings.rrf_w_lexical),
             )
 
-        result = run_agent(
-            question,
-            retrieve=retrieve,
-            generate=lambda system, user: self._llm.complete(system, user),
-            generate_stream=lambda system, user: self._llm.complete_stream(system, user),
-            max_iterations=settings.ask_max_iterations,
-            top_k=top_k,
-            on_event=on_event,
-            on_tokens=on_tokens,
-            compress=self._compress,
+        try:
+            result = run_agent(
+                question,
+                retrieve=retrieve,
+                generate=lambda system, user: self._llm.complete(system, user),
+                generate_stream=lambda system, user: self._llm.complete_stream(system, user),
+                max_iterations=settings.ask_max_iterations,
+                top_k=top_k,
+                on_event=on_event,
+                on_tokens=on_tokens,
+                compress=self._compress,
+            )
+        except Exception as exc:
+            self.metrics.inc("ask_errors")
+            self._log.warning(json.dumps({"op": "ask", "error": str(exc)}))
+            raise
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        self.metrics.inc("ask_total")
+        self.metrics.observe("ask_ms", elapsed_ms)
+        self.metrics.inc(f"ask_provider_{result.provider}")
+        self._log.info(
+            json.dumps(
+                {
+                    "op": "ask",
+                    "elapsed_ms": round(elapsed_ms, 1),
+                    "cache_hit": False,
+                    "provider": result.provider,
+                    "model": result.model,
+                    "iterations": result.iterations,
+                    "sources": len(result.sources),
+                }
+            )
         )
         result.trace.append(
             TraceStep(

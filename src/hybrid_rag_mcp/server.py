@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import queue
 import secrets
+import sys
 import threading
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -12,7 +14,8 @@ from mcp.server.mcpserver import Context, MCPServer
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.routing import Route
 from starlette.types import ASGIApp
 
 from .config import Settings, get_settings
@@ -74,6 +77,12 @@ def search(query: str, top_k: int = 5) -> str:
     if not hits:
         return "Nenhum resultado encontrado. Execute 'ingest' antes."
     return _format_hits(hits)
+
+
+@mcp.tool()
+def metrics() -> str:
+    """Resumo das métricas do servidor (contadores + latências p50/p95 desde o boot)."""
+    return _ensure_engine().metrics.render_text()
 
 
 @mcp.tool()
@@ -176,7 +185,13 @@ def _build_http_app(settings: Settings) -> Starlette:
     assert isinstance(app, Starlette)
     if settings.mcp_auth_token:
         app.add_middleware(_BearerAuthMiddleware, token=settings.mcp_auth_token)
+    app.router.routes.append(Route("/metrics", _metrics_endpoint))
     return app
+
+
+async def _metrics_endpoint(request: Request) -> PlainTextResponse:
+    """Métricas em formato Prometheus (herda o bearer auth do app)."""
+    return PlainTextResponse(_ensure_engine().metrics.render_prometheus())
 
 
 async def _run_http(host: str, port: int) -> None:
@@ -187,8 +202,24 @@ async def _run_http(host: str, port: int) -> None:
     await uvicorn.Server(config).serve()
 
 
+def _configure_logging() -> None:
+    """Logs JSON do engine no stderr (o stdout pertence ao protocolo MCP no stdio).
+
+    Configura o logger do pacote de forma explícita em vez de `basicConfig`:
+    a raiz já costuma ter handlers do SDK/uvicorn, e `basicConfig` vira no-op
+    nesse caso (nível INFO nunca aplicado).
+    """
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger = logging.getLogger("hybrid_rag_mcp")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # uma cópia só, sem duplicar nos handlers da raiz
+
+
 def main() -> None:
     """Ponto de entrada da CLI: serve o MCP via stdio (padrão) ou streamable HTTP."""
+    _configure_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--transport",

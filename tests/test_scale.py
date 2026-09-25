@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from hybrid_rag_mcp.bench import build_scale_corpus, percentiles
+from hybrid_rag_mcp.bench import build_scale_corpus
+from hybrid_rag_mcp.metrics import percentiles
 
 
 def test_percentiles_nearest_rank() -> None:

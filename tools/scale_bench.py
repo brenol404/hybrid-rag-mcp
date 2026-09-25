@@ -31,9 +31,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from hybrid_rag_mcp.bench import build_scale_corpus, percentiles
+from hybrid_rag_mcp.bench import build_scale_corpus
 from hybrid_rag_mcp.config import get_settings
 from hybrid_rag_mcp.eval import load_datasets
+from hybrid_rag_mcp.metrics import percentiles
 from hybrid_rag_mcp.rag.engine import RAGEngine
 from hybrid_rag_mcp.rag.ingestion import SUPPORTED_EXTS, read_document
 

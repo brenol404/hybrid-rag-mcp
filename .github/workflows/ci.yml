@@ -45,7 +45,7 @@ jobs:
           import asyncio
           from hybrid_rag_mcp.server import mcp
           tools = asyncio.run(mcp.list_tools())
-          assert {t.name for t in tools} == {'ask', 'ingest', 'search'}, [t.name for t in tools]
+          assert {t.name for t in tools} == {'ask', 'ingest', 'metrics', 'search'}, [t.name for t in tools]
           print('tools OK:', sorted(t.name for t in tools))
           "
 
@@ -64,7 +64,7 @@ jobs:
                       await session.initialize()
                       tools = await session.list_tools()
                       names = {t.name for t in tools.tools}
-                      assert names == {'ask', 'ingest', 'search'}, names
+                      assert names == {'ask', 'ingest', 'metrics', 'search'}, names
                       print('HTTP tools OK:', sorted(names))
           asyncio.run(main())
           "

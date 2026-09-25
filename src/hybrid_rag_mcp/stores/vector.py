@@ -53,23 +53,28 @@ class VectorStore:
         if not chunks:
             return
         self._ensure_collection()
-        vectors = self._embedder.embed([c.content for c in chunks])
-        self._client.upsert(
-            collection_name=self.COLLECTION,
-            points=[
-                qm.PointStruct(
-                    id=_hash_point(c.chunk_id),
-                    vector=v,
-                    payload={
-                        "chunk_id": c.chunk_id,
-                        "doc": c.doc_name,
-                        "text": c.content,
-                        "hid": _hash_content(c.content),
-                    },
-                )
-                for c, v in zip(chunks, vectors, strict=True)
-            ],
-        )
+        # Lotes de upsert: embedar tudo de uma vez segurava N×dim floats em
+        # memória (100k chunks × 1024 dim ≈ GBs em objetos Python) — numa
+        # máquina pequena isso trava em swap antes do primeiro upsert.
+        for i in range(0, len(chunks), _UPSERT_BATCH):
+            batch = chunks[i : i + _UPSERT_BATCH]
+            vectors = self._embedder.embed([c.content for c in batch])
+            self._client.upsert(
+                collection_name=self.COLLECTION,
+                points=[
+                    qm.PointStruct(
+                        id=_hash_point(c.chunk_id),
+                        vector=v,
+                        payload={
+                            "chunk_id": c.chunk_id,
+                            "doc": c.doc_name,
+                            "text": c.content,
+                            "hid": _hash_content(c.content),
+                        },
+                    )
+                    for c, v in zip(batch, vectors, strict=True)
+                ],
+            )
 
     def sync_chunks(self, chunks: list[DocumentChunk]) -> dict[str, int]:
         """Sincroniza o índice com a lista de chunks: adiciona os novos, remove órfãos.
@@ -162,6 +167,7 @@ def _hash_content(text: str) -> int:
 
 
 _SCROLL_BATCH = 1000
+_UPSERT_BATCH = 1000
 
 
 def _scroll_all(client: qdrant_client.QdrantClient, collection_name: str) -> list[qm.Record]:

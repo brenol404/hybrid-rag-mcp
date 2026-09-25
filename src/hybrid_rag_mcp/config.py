@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     embed_model: str = "bge-m3"
     llm_model: str = "qwen3:8b"
+    embed_batch_size: int = 32  # embeddings por request (medido: 16-32 é o ponto ótimo)
 
     cloud_base_url: str = ""
     cloud_api_key: str = ""

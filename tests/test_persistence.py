@@ -211,3 +211,28 @@ def test_vector_store_escolhe_embarcado_ou_servidor(tmp_path: Path, monkeypatch)
     )
     assert calls[-1][1].get("url") == "http://localhost:6333"
     assert "path" not in calls[-1][1]
+
+
+def test_upsert_em_lotes_nao_segura_tudo_em_memoria(tmp_path: Path, monkeypatch) -> None:
+    """Upsert em lotes de 1000: embedar N×dim de uma vez estourava RAM/swap.
+
+    Regressão real do bench de 100k (máquina pequena travou antes do primeiro
+    upsert). Espiona as chamadas para provar o fatiamento sem pesar a memória.
+    """
+    from hybrid_rag_mcp.models import DocumentChunk
+
+    settings = Settings(qdrant_path=str(tmp_path / "qdrant"))
+    vector = VectorStore(settings, StubEmbedder())
+    calls: list[int] = []
+    orig = vector._client.upsert
+
+    def spy(**kwargs) -> None:
+        calls.append(len(kwargs["points"]))
+        orig(**kwargs)
+
+    monkeypatch.setattr(vector._client, "upsert", spy)
+    chunks = [DocumentChunk(f"c{i}", "d", f"conteúdo do chunk {i}", i) for i in range(2500)]
+    vector.upsert_chunks(chunks)
+    assert calls == [1000, 1000, 500]
+    assert len(vector.all_chunks()) == 2500
+    vector.close()

@@ -51,7 +51,7 @@ flowchart LR
     M --> I["ingest"]
     I --> C1["Chunker<br/>seções + sentenças"]
     C1 --> E["Embeddings<br/>Ollama bge-m3"]
-    E --> Q1[("Qdrant local<br/>busca vetorial")]
+    E --> Q1[("Qdrant<br/>busca vetorial")]
     C1 --> K["BM25 próprio<br/>busca léxica"]
     AGE --> RET["Busca híbrida"]
     RET --> Q1 & K

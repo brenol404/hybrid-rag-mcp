@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Iterator
+from typing import Any
 
 from ..config import Settings
 from .base import LLMProvider, LLMResponse
@@ -42,12 +44,19 @@ class CloudLLM(LLMProvider):
 
     provider_name = "cloud"
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+    ) -> None:
         import httpx
 
-        self._base_url = settings.cloud_base_url.rstrip("/")
-        self._api_key = settings.cloud_api_key
-        self._model = settings.cloud_model
+        self._base_url = (base_url or settings.cloud_base_url).rstrip("/")
+        self._api_key = api_key or settings.cloud_api_key
+        self._model = model or settings.cloud_model
         self._http = httpx.Client(timeout=60)
 
     def close(self) -> None:
@@ -70,14 +79,65 @@ class CloudLLM(LLMProvider):
         return LLMResponse(text=text, provider=self.provider_name, model=self._model)
 
 
-class FallbackLLM:
-    """Tenta o provedor de nuvem e cai automaticamente para Ollama local."""
+def parse_llm_chain(settings: Settings) -> list[dict[str, Any]]:
+    """Lista ordenada de endpoints de nuvem a partir da config.
 
-    def __init__(self, settings: Settings) -> None:
-        providers: list[LLMProvider] = [OllamaLLM(settings)]
-        if settings.cloud_api_key and settings.cloud_base_url:
-            providers.insert(0, CloudLLM(settings))
-        self._providers = providers
+    `LLM_CHAIN` (JSON) vence; sem ele, o trio `CLOUD_*` vira 1 entrada;
+    sem nada, lista vazia (só Ollama). Erro claro em JSON/forma inválidos.
+    """
+    raw = settings.llm_chain.strip()
+    if raw:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"LLM_CHAIN com JSON inválido: {exc}") from exc
+        if not isinstance(data, list):
+            raise ValueError("LLM_CHAIN deve ser uma lista JSON de {base_url, api_key, model}")
+        entries = data
+    elif settings.cloud_base_url and settings.cloud_api_key:
+        entries = [
+            {
+                "base_url": settings.cloud_base_url,
+                "api_key": settings.cloud_api_key,
+                "model": settings.cloud_model,
+            }
+        ]
+    else:
+        return []
+    required = ("base_url", "api_key", "model")
+    for i, entry in enumerate(entries):
+        if not isinstance(entry, dict) or any(not entry.get(k) for k in required):
+            raise ValueError(
+                f"LLM_CHAIN[{i}] inválido: cada elo precisa de {list(required)} preenchidos"
+            )
+    return entries
+
+
+class FallbackLLM:
+    """Cascata de provedores em ordem de prioridade; Ollama local sempre por último.
+
+    Fontes da lista: `LLM_CHAIN` (JSON) ou o trio `CLOUD_*` (compat). Sem nuvem,
+    vira só Ollama. A primeira resposta válida vence; falhas caem para o próximo.
+    """
+
+    def __init__(
+        self, settings: Settings | None = None, providers: list[LLMProvider] | None = None
+    ) -> None:
+        if providers is not None:
+            self._providers = providers
+            return
+        assert settings is not None
+        chain: list[LLMProvider] = [
+            CloudLLM(
+                settings,
+                base_url=entry["base_url"],
+                api_key=entry["api_key"],
+                model=entry["model"],
+            )
+            for entry in parse_llm_chain(settings)
+        ]
+        chain.append(OllamaLLM(settings))
+        self._providers = chain
 
     @property
     def has_cloud(self) -> bool:

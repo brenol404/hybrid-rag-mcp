@@ -218,7 +218,9 @@ Copie `.env.example` para `.env` e preencha `CLOUD_BASE_URL` + `CLOUD_API_KEY` +
 (qualquer endpoint OpenAI-compatível). A nuvem assume prioridade; o Ollama responde automaticamente
 se a API falhar ou ficar offline. Para embeddings na nuvem, preencha também
 `CLOUD_EMBED_MODEL` — atenção: trocar o modelo muda a dimensão e exige recriar
-o índice (`ingest` de novo).
+o índice (`ingest` de novo). Para **várias APIs em cascata** (ex.: Nvidia →
+Gemini → Ollama), use `LLM_CHAIN` com a lista em ordem de prioridade — a
+primeira que responder vence, paga-se só ela por pergunta.
 
 ## Deploy
 
@@ -311,7 +313,7 @@ Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade
 
-- **88 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem e checagem de dimensão.
+- **95 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão e cascata de LLMs.
 - CI em 2 jobs: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

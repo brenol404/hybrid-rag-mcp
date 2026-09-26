@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     ask_max_iterations: int = 2
 
     mcp_auth_token: str = ""  # se setado, o transporte HTTP exige `Authorization: Bearer`
+    llm_chain: str = (
+        ""  # JSON: [{"base_url":..,"api_key":..,"model":..}, ...] em ordem de prioridade
+    )
 
 
 @lru_cache

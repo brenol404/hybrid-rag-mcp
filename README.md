@@ -219,7 +219,9 @@ Copy `.env.example` to `.env` and fill in `CLOUD_BASE_URL` + `CLOUD_API_KEY` + `
 (any OpenAI-compatible endpoint). Cloud takes priority; Ollama answers automatically
 if the API fails or goes offline. For cloud embeddings, also set
 `CLOUD_EMBED_MODEL` — note: switching models changes the dimension and requires
-recreating the index (re-run `ingest`).
+recreating the index (re-run `ingest`). For a **multi-API cascade** (e.g. Nvidia →
+Gemini → Ollama), use `LLM_CHAIN` with the list in priority order — the first
+to answer wins, you pay only it per question.
 
 ## Deploy
 
@@ -312,7 +314,7 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality
 
-- **88 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25, persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings and dimension check.
+- **95 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25, persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check and LLM cascade.
 - CI in 2 jobs: `test` (ruff + **mypy strict** + pytest with ≥75% coverage + `pip-audit` + stdio/HTTP smoke) and `eval` (real Ollama + `recall@1 >= 0.8` gate). Weekly Dependabot (pip + actions).
 - Two storage modes: **embedded** (default, no Docker, 1 process at a time) or
   **server** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) for

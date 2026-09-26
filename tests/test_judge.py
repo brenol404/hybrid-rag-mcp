@@ -57,3 +57,17 @@ def test_run_eval_agrega_e_isola_falhas() -> None:
     assert "média: 2.00" in text
     assert "SEM VEREDITO" in text
     assert "erro: LLM fora do ar" in text
+
+
+def test_erro_no_juiz_vira_sem_veredito() -> None:
+    def ask_fn(q: str):
+        return _Resp("resposta qualquer")
+
+    def judge_fn(system: str, user: str):
+        raise ConnectionError("ollama desconectou")
+
+    report = run_eval([{"id": "a1", "question": "porta?", "expected": "8443"}], ask_fn, judge_fn)
+    assert len(report.verdicts) == 1
+    assert report.verdicts[0].score is None
+    assert "erro no juiz" in report.verdicts[0].justification
+    assert report.mean_score() == 0.0

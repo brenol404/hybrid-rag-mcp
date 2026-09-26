@@ -108,7 +108,22 @@ def run_eval(
                 )
             )
             continue
-        score, justification = judge_one(item["question"], item["expected"], answer_text, judge_fn)
+        try:
+            score, justification = judge_one(
+                item["question"], item["expected"], answer_text, judge_fn
+            )
+        except Exception as exc:  # noqa: BLE001 - erro no juiz também vira sem veredito
+            report.verdicts.append(
+                ItemVerdict(
+                    item["id"],
+                    item["question"],
+                    item["expected"],
+                    answer_text,
+                    None,
+                    f"erro no juiz: {exc}",
+                )
+            )
+            continue
         report.verdicts.append(
             ItemVerdict(
                 item["id"], item["question"], item["expected"], answer_text, score, justification

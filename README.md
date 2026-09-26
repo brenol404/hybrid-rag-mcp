@@ -318,7 +318,8 @@ src/hybrid_rag_mcp/
 ```
 
 Architecture decisions with context and evidence: [`docs/adr/`](docs/adr/)
-(RRF, storage, cache, judge, lazy-init, external integrations). Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+(RRF, storage, cache, judge, lazy-init, external integrations, cascade scope,
+BM25 tradeoff, open seams). Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality

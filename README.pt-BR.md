@@ -317,7 +317,8 @@ src/hybrid_rag_mcp/
 ```
 
 Decisões de arquitetura com contexto e evidência: [`docs/adr/`](docs/adr/)
-(RRF, storage, cache, juiz, lazy-init, integrações externas). Guia de contribuição: [CONTRIBUTING.md](CONTRIBUTING.md).
+(RRF, storage, cache, juiz, lazy-init, integrações externas, escopo da cascata,
+tradeoff do BM25, abertura). Guia de contribuição: [CONTRIBUTING.md](CONTRIBUTING.md).
 Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade

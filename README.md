@@ -26,6 +26,7 @@ Focus: index technical documents (Markdown, TXT, PDF) and answer questions with 
 - [Deploy](#deploy)
 - [Observability](#observability)
 - [MCP tools](#mcp-tools)
+- [Extending](#extending)
 - [Structure](#structure)
 - [Quality](#quality)
 
@@ -216,7 +217,9 @@ Register in any MCP client (Claude Desktop, editors, agents):
 
 Copy `.env.example` to `.env` and fill in `CLOUD_BASE_URL` + `CLOUD_API_KEY` + `CLOUD_MODEL`
 (any OpenAI-compatible endpoint). Cloud takes priority; Ollama answers automatically
-if the API fails or goes offline.
+if the API fails or goes offline. For cloud embeddings, also set
+`CLOUD_EMBED_MODEL` — note: switching models changes the dimension and requires
+recreating the index (re-run `ingest`).
 
 ## Deploy
 
@@ -263,6 +266,18 @@ counters (`search_total`, `ask_total`, `ask_cache_hits`, `*_errors`,
 | `ask`    | Multi-step agent: retrieves, generates, detects insufficient context, re-searches and answers citing sources (with audit log). Consults the **semantic cache** before generating. |
 | `metrics` | Server metrics summary (counters + p50/p95 latencies since boot). |
 
+## Extending
+
+Nothing here is mandatory — every piece has a local default and can be swapped without forking:
+
+- **Compressor**: any `(str) -> str` callable via `CONTEXT_COMPRESSOR=my_package:clean`
+  (beats the built-in 0/1/2 levels). E.g. a sidecar like Headroom wrapped in a function.
+- **Embeddings/LLM**: `EmbeddingProvider` / `LLMProvider` ABCs (`src/hybrid_rag_mcp/providers/`);
+  cloud via `CLOUD_*` with no code changes. Switching embeddings changes the dimension:
+  wipe the index and re-run `ingest`, or set `QDRANT_RECREATE_ON_DIM_CHANGE=1`.
+- **Reranker**: `score(query, texts) -> list[float]` duck-type (see `providers/rerank.py`);
+  empty = off, with graceful degradation.
+
 ## Structure
 
 ```
@@ -297,7 +312,7 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality
 
-- **80 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25, persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation and observability.
+- **88 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25, persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings and dimension check.
 - CI in 2 jobs: `test` (ruff + **mypy strict** + pytest with ≥75% coverage + `pip-audit` + stdio/HTTP smoke) and `eval` (real Ollama + `recall@1 >= 0.8` gate). Weekly Dependabot (pip + actions).
 - Two storage modes: **embedded** (default, no Docker, 1 process at a time) or
   **server** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) for

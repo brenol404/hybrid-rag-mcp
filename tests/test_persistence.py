@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from hybrid_rag_mcp.config import Settings
+from hybrid_rag_mcp.models import DocumentChunk
 from hybrid_rag_mcp.rag import engine as engine_module
 from hybrid_rag_mcp.rag.engine import RAGEngine
 from hybrid_rag_mcp.rag.hybrid import hybrid_search
@@ -236,3 +237,43 @@ def test_upsert_em_lotes_nao_segura_tudo_em_memoria(tmp_path: Path, monkeypatch)
     assert calls == [1000, 1000, 500]
     assert len(vector.all_chunks()) == 2500
     vector.close()
+
+
+class _DimEmbed(StubEmbedder):
+    def __init__(self, dim: int) -> None:
+        self._dim = dim
+
+    @property
+    def dim(self) -> int:  # type: ignore[override]
+        return self._dim
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] * self._dim for _ in texts]
+
+
+def test_dim_mudou_erro_claro_sem_recreate(tmp_path: Path) -> None:
+    import pytest
+
+    settings = Settings(qdrant_path=str(tmp_path / "qdrant"))
+    v4 = VectorStore(settings, _DimEmbed(4))
+    v4.upsert_chunks([DocumentChunk("c1", "d", "texto", 0)])
+    v4.close()
+
+    v8 = VectorStore(settings, _DimEmbed(8))
+    with pytest.raises(RuntimeError, match="dimensão do embedder mudou"):
+        v8.upsert_chunks([DocumentChunk("c2", "d", "outro", 0)])
+    v8.close()
+
+
+def test_dim_mudou_com_recreate_recomeca_vazio(tmp_path: Path) -> None:
+    settings = Settings(qdrant_path=str(tmp_path / "qdrant"), qdrant_recreate_on_dim_change=True)
+    v4 = VectorStore(settings, _DimEmbed(4))
+    v4.upsert_chunks([DocumentChunk("c1", "d", "texto", 0)])
+    assert len(v4.all_chunks()) == 1
+    v4.close()
+
+    v8 = VectorStore(settings, _DimEmbed(8))
+    v8.upsert_chunks([DocumentChunk("c2", "d", "outro texto", 0)])
+    staying = {c.chunk_id for c in v8.all_chunks()}
+    assert staying == {"c2"}  # coleção recriada: c1 sumiu, re-ingest em seguida
+    v8.close()

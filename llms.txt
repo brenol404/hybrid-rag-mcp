@@ -1,0 +1,31 @@
+# hybrid-rag-mcp
+
+> Local-first hybrid-RAG MCP server (Qdrant + BM25 via RRF), multi-step agent, offline Ollama fallback. Leia em [português](README.pt-BR.md).
+
+- [README](README.md): setup, tools, metrics, deploy, observability
+- [Architecture decisions](docs/adr/): RRF weights, storage, cache, judge, lazy-init, integrations
+- [Contributing](CONTRIBUTING.md): lint, mypy strict, tests, commit style
+- [Changelog](CHANGELOG.md): release history
+- [Configuration](.env.example): all env vars (Ollama, cloud, Qdrant, cache, auth)
+- [Answer eval set](eval/answers.jsonl): 12 grounded Q&A pairs used by the llm-as-judge
+- [Retrieval eval sets](eval/dataset.jsonl): 12 hand-curated queries + auto-generated `eval/dataset.real.jsonl`
+- [Demo](examples/demo.sh): ingest + search + ask in ~1 min (needs Ollama)
+
+## Tools (MCP)
+
+- `ingest(corpus_dir="")`: index md/txt/pdf into Qdrant + BM25 (incremental, idempotent)
+- `search(query, top_k=5)`: hybrid search returning snippets + sources
+- `ask(question, top_k=5)`: multi-step RAG with cited sources (checks semantic cache first)
+- `metrics()`: server counters + p50/p95 latencies since boot
+
+## Transports
+
+- stdio (default): `python -m hybrid_rag_mcp`
+- streamable HTTP: `python -m hybrid_rag_mcp --transport http --port 8000` (`GET /mcp`, `GET /metrics`)
+- HTTP auth (optional): `MCP_AUTH_TOKEN` bearer token on server and client
+
+## Extension seams
+
+- Compressor: any `(str) -> str` callable via `CONTEXT_COMPRESSOR=pkg.mod:func` (or built-in levels `CONTEXT_COMPRESSION=0|1|2`)
+- Embeddings/LLM: `EmbeddingProvider` / `LLMProvider` ABCs (`src/hybrid_rag_mcp/providers/`); cloud via `CLOUD_*` env vars
+- Reranker: duck-type `score(query, texts) -> list[float]` (see `providers/rerank.py`)

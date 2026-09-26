@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     cloud_base_url: str = ""
     cloud_api_key: str = ""
     cloud_model: str = ""
+    cloud_embed_model: str = ""  # ex.: text-embedding-3-small — vazio = embeddings no Ollama
 
     corpus_dir: str = "examples/corpus"
     data_dir: str = "data"
@@ -24,6 +25,9 @@ class Settings(BaseSettings):
     audit_keep: int = 3  # quantos backups (audit.jsonl.1, .2, ...) manter
     qdrant_path: str = "data/qdrant"
     qdrant_url: str = ""  # ex.: http://localhost:6333 — se setado, usa servidor (multi-processo)
+    qdrant_recreate_on_dim_change: bool = (
+        False  # True: recria a coleção se a dim do embedder mudar (exige re-ingest)
+    )
 
     cache_enabled: bool = True
     cache_path: str = "data/cache.jsonl"
@@ -32,6 +36,9 @@ class Settings(BaseSettings):
     cache_max_entries: int = 256
 
     context_compression: int = 0
+    context_compressor: str = (
+        ""  # ex.: meu_pacote:limpar — callable (str)->str; vence o nível acima
+    )
 
     chunk_size: int = 512
     chunk_overlap: int = 64

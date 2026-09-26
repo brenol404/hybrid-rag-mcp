@@ -19,6 +19,7 @@ class VectorStore:
     COLLECTION = "chunks"
 
     def __init__(self, settings: Settings, embedder: EmbeddingProvider) -> None:
+        self._settings = settings
         if settings.qdrant_url:
             # Modo servidor: índice compartilhado, vários processos/sessões
             # simultâneas (ver docker-compose.yml). Sem lock de arquivo.
@@ -44,6 +45,36 @@ class VectorStore:
                     collection_name=self.COLLECTION,
                     vectors_config=qm.VectorParams(size=self._dim, distance=qm.Distance.COSINE),
                 )
+                return
+            stored = self._stored_dim()
+            if stored is not None and stored != self._dim:
+                if self._settings_qdrant_recreate():
+                    self._client.delete_collection(self.COLLECTION)
+                    self._client.create_collection(
+                        collection_name=self.COLLECTION,
+                        vectors_config=qm.VectorParams(size=self._dim, distance=qm.Distance.COSINE),
+                    )
+                else:
+                    raise RuntimeError(
+                        f"dimensão do embedder mudou ({stored} → {self._dim}): o índice "
+                        "existente é incompatível. Apague o diretório do Qdrant e rode "
+                        "`ingest` de novo, ou ligue QDRANT_RECREATE_ON_DIM_CHANGE=1 "
+                        "para recriar automaticamente (exige re-ingest em seguida)."
+                    )
+
+    def _settings_qdrant_recreate(self) -> bool:
+        return bool(self._settings.qdrant_recreate_on_dim_change)
+
+    def _stored_dim(self) -> int | None:
+        """Dimensão gravada na coleção, ou None se indeterminável."""
+        try:
+            vectors = self._client.get_collection(self.COLLECTION).config.params.vectors
+            if isinstance(vectors, dict):  # coleções multivector nomeadas
+                vectors = vectors.get("default", next(iter(vectors.values()), None))
+            size = getattr(vectors, "size", None)
+            return int(size) if size is not None else None
+        except Exception:  # noqa: BLE001 - sonda de versão: indeterminável segue sem checar
+            return None
 
     def _scroll_all_points(self) -> list[qm.Record]:
         """Lê todos os pontos da coleção com scroll paginado (Batch > página única)."""

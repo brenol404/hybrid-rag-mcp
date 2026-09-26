@@ -67,3 +67,37 @@ def test_agent_compresses_prompt_but_keeps_original_sources() -> None:
     assert result.answer == "resposta [doc.txt]."
     # fontes preservam o texto ORIGINAL (compressão é só na cópia do prompt)
     assert "ficam em São Paulo" in result.sources[0].content
+
+
+def test_resolve_compressor_dotted_path_vence_nivel() -> None:
+    from hybrid_rag_mcp.config import Settings
+    from hybrid_rag_mcp.optimize.compress import resolve_compressor
+
+    fn = resolve_compressor(Settings(context_compressor="string:capwords"))
+    assert callable(fn)
+    assert fn("ola mundo") == "Ola Mundo"
+
+    fn = resolve_compressor(Settings(context_compressor="string:capwords", context_compression=2))
+    assert fn("ola mundo") == "Ola Mundo"  # dotted path vence o nível
+
+
+def test_resolve_compressor_cai_no_nivel_quando_vazio() -> None:
+    from hybrid_rag_mcp.config import Settings
+    from hybrid_rag_mcp.optimize.compress import resolve_compressor
+
+    assert resolve_compressor(Settings(context_compressor="", context_compression=0)) is None
+    assert callable(resolve_compressor(Settings(context_compressor=" ", context_compression=1)))
+
+
+def test_resolve_compressor_erros_claros() -> None:
+    import pytest
+
+    from hybrid_rag_mcp.config import Settings
+    from hybrid_rag_mcp.optimize.compress import resolve_compressor
+
+    with pytest.raises(ValueError, match="formato"):
+        resolve_compressor(Settings(context_compressor="sem-separador"))
+    with pytest.raises(ValueError, match="não encontrado"):
+        resolve_compressor(Settings(context_compressor="modulo_que_nao_existe:f"))
+    with pytest.raises(ValueError, match="não é chamável"):
+        resolve_compressor(Settings(context_compressor="os:name"))

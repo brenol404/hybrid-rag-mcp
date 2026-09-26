@@ -14,7 +14,10 @@ Negação (não/not/nunca/…) e números nunca são removidos.
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Callable
+
+from ..config import Settings
 
 # (categoria, palavras) — PT e EN. Nunca incluir negação.
 _DETERMINERS = {
@@ -160,6 +163,31 @@ def make_compressor(level: int) -> Callable[[str], str] | None:
     if not stops:
         return None
     return lambda text: _compress(text, stops)
+
+
+def resolve_compressor(settings: Settings) -> Callable[[str], str] | None:
+    """Compressor efetivo: dotted path externo (`pkg.mod:func`) vence o nível built-in.
+
+    Qualquer callable `(str) -> str` serve — é a costura de extensão. Erro claro
+    se o módulo/atributo não existir ou não for chamável.
+    """
+    dotted = settings.context_compressor.strip()
+    if dotted:
+        mod_name, sep, attr = dotted.partition(":")
+        if not sep or not mod_name or not attr:
+            raise ValueError(
+                f"CONTEXT_COMPRESSOR inválido {dotted!r}: use o formato pacote.modulo:funcao"
+            )
+        try:
+            mod = importlib.import_module(mod_name)
+        except ImportError as exc:
+            raise ValueError(f"compressor não encontrado: {dotted!r} ({exc})") from exc
+        fn = getattr(mod, attr, None)
+        if not callable(fn):
+            raise ValueError(f"compressor não é chamável: {dotted!r}")
+        compressor: Callable[[str], str] = fn
+        return compressor
+    return make_compressor(settings.context_compression)
 
 
 def _compress(text: str, stops: set[str]) -> str:

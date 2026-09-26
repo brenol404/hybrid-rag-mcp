@@ -10,7 +10,7 @@ from pathlib import Path
 from ..config import Settings, get_settings
 from ..metrics import Metrics
 from ..models import AskResult, SearchHit, TraceStep
-from ..optimize import SemanticCache, make_compressor
+from ..optimize import SemanticCache, resolve_compressor
 from ..providers import FallbackLLM, resolve_embedder
 from ..providers.rerank import build_reranker
 from ..stores import LexicalStore, VectorStore
@@ -31,7 +31,7 @@ class RAGEngine:
         self._reranker = build_reranker(settings)
         self._llm = FallbackLLM(settings)
         self._cache = SemanticCache(settings, self._embedder) if settings.cache_enabled else None
-        self._compress = make_compressor(settings.context_compression)
+        self._compress = resolve_compressor(settings)
         # Restauração do BM25 é preguiçosa (1º search/ask): construir o engine
         # não toca em Ollama nem no Qdrant.
         self._ready = False

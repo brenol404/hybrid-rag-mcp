@@ -121,22 +121,15 @@ tomou OOM — acima de ~100k chunks ou pouca RAM, usar o modo servidor
 palavras de função previsíveis (conectivos/enchimentos no nível 1; + artigos e
 auxiliares no nível 2) **apenas da cópia que vai para o prompt** do LLM: a busca, o
 re-ranking e as fontes exibidas continuam com o texto original, e números, nomes
-próprios e negações nunca são removidos. Determinística, multilíngue (PT/EN), zero
-dependências.
+próprios e negações nunca são removidos. Determinística, multilíngue
+(PT/EN), zero dependências — princípio inspirado no
+[Caveman](https://github.com/wilpel/caveman-compression) ("tirar gramática,
+manter fatos"), reimplementado sem dependências.
 
 ```bash
 python tools/optimizers_report.py        # painel: cache + compressão + integrações avaliadas
 python tools/optimizers_report.py --json # mesma saída em JSON
 ```
-
-**Integrações externas avaliadas — mantidas opcionais (nada entra no core):**
-
-| Ferramenta | Onde atuaria | Veredito |
-|---|---|---|
-| [Headroom](https://github.com/headroomlabs-ai/headroom) | compressão reversível de contexto/tool outputs/RAG chunks; lib Python + MCP server próprios | adotável futuramente como sidecar MCP; carga ONNX/HF (`pip install headroom`) |
-| [RTK](https://github.com/rtk-ai/rtk) | compressão de saída de shell para agentes de coding | fora do runtime — recomendado no ambiente de dev |
-| [Caveman](https://github.com/wilpel/caveman-compression) | princípio "tirar gramática, manter fatos" (PT incluso) | **já embutido** em `CONTEXT_COMPRESSION` |
-| [Ponytail](https://github.com/DietrichGebert/ponytail) | cortar volume de código gerado por agentes | não se aplica a um servidor RAG |
 
 ## Corpus
 
@@ -298,7 +291,7 @@ src/hybrid_rag_mcp/
 ```
 
 Decisões de arquitetura com contexto e evidência: [`docs/adr/`](docs/adr/)
-(RRF, storage, cache, juiz, lazy-init). Guia de contribuição: [CONTRIBUTING.md](CONTRIBUTING.md).
+(RRF, storage, cache, juiz, lazy-init, integrações externas). Guia de contribuição: [CONTRIBUTING.md](CONTRIBUTING.md).
 Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade

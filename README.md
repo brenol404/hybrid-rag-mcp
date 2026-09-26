@@ -123,21 +123,14 @@ predictable function words (connectives/fillers at level 1; + articles and
 auxiliaries at level 2) **only from the copy that goes into the LLM prompt**:
 search, re-ranking and displayed sources keep the original text, and numbers,
 proper nouns and negations are never removed. Deterministic, multilingual
-(PT/EN), zero dependencies.
+(PT/EN), zero dependencies — principle inspired by
+[Caveman](https://github.com/wilpel/caveman-compression) ("strip grammar, keep
+facts"), reimplemented in-house.
 
 ```bash
 python tools/optimizers_report.py        # dashboard: cache + compression + evaluated integrations
 python tools/optimizers_report.py --json # same output as JSON
 ```
-
-**Evaluated external integrations — kept optional (nothing enters the core):**
-
-| Tool | Where it would fit | Verdict |
-|---|---|---|
-| [Headroom](https://github.com/headroomlabs-ai/headroom) | reversible compression of context/tool outputs/RAG chunks; own Python lib + MCP server | adoptable later as MCP sidecar; ONNX/HF load (`pip install headroom`) |
-| [RTK](https://github.com/rtk-ai/rtk) | shell-output compression for coding agents | outside the runtime — recommended in the dev environment |
-| [Caveman](https://github.com/wilpel/caveman-compression) | "strip grammar, keep facts" principle (PT included) | **already embedded** in `CONTEXT_COMPRESSION` |
-| [Ponytail](https://github.com/DietrichGebert/ponytail) | cutting the volume of agent-generated code | doesn't apply to a RAG server |
 
 ## Corpus
 
@@ -299,7 +292,7 @@ src/hybrid_rag_mcp/
 ```
 
 Architecture decisions with context and evidence: [`docs/adr/`](docs/adr/)
-(RRF, storage, cache, judge, lazy-init). Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+(RRF, storage, cache, judge, lazy-init, external integrations). Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality

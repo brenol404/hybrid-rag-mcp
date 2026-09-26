@@ -103,9 +103,14 @@ embarcado numa máquina de 4GB RAM.
 | métrica | 32.760 chunks indexados |
 |---|---|
 | ingest | 566s (**58 chunks/s**), índice 337MB em disco |
-| busca 1 thread | p50 269ms · p95 663ms · média 404ms |
-| busca 8 threads | p50 1313ms · p95 2334ms |
-| p99 single 4,4s | custo one-time de warmup (1ª busca restaura o BM25) |
+| busca 1 thread | p50 191ms · p95 621ms · média 373ms |
+| busca 8 threads | p50 640ms · p95 4308ms |
+| p99 single ≈5s | custo one-time de warmup (1ª busca restaura o BM25; varia entre runs) |
+
+Re-medição com BM25 vetorizado (antes: p50 269/p95 663 single, p50 1313/p95
+2334 concurrent). O p50 caiu ~30% single e ~50% concorrente — o numpy libera
+o GIL no caminho vetorizado; as caudas (p95/p99) variam ±2x entre runs nesta
+máquina, ruído e não sinal.
 
 Leituras honestas (incluindo uma correção nossa): o palpite inicial era que o
 BM25 em Python puro fosse o gargalo — medido, não era: em 32k docs o

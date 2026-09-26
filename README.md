@@ -104,9 +104,14 @@ Qdrant on a 4GB RAM box.
 | metric | 32,760 indexed chunks |
 |---|---|
 | ingest | 566s (**58 chunks/s**), 337MB index on disk |
-| 1-thread search | p50 269ms · p95 663ms · mean 404ms |
-| 8-thread search | p50 1313ms · p95 2334ms |
-| p99 single 4.4s | one-time warmup cost (first search restores the BM25 index) |
+| 1-thread search | p50 191ms · p95 621ms · mean 373ms |
+| 8-thread search | p50 640ms · p95 4308ms |
+| p99 single ≈5s | one-time warmup cost (first search restores the BM25 index; varies across runs) |
+
+Re-measured with vectorized BM25 (before: p50 269/p95 663 single, p50 1313/p95
+2334 concurrent). p50 fell ~30% single-threaded and ~50% concurrent — numpy
+releases the GIL on the vectorized path; tails (p95/p99) swing ±2x between
+runs on this box, noise not signal.
 
 Honest readings (including our own correction): the initial guess was that
 pure-Python BM25 was the bottleneck — measured, it wasn't: at 32k docs

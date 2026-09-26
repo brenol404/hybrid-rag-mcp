@@ -109,3 +109,62 @@ def test_lexical_store_seguro_sob_rebuild_concorrente() -> None:
         for t in threads:
             t.join(timeout=10)
     assert not errors, errors[:3]
+
+
+def _brute_force(
+    corpus: list[list[str]], query: list[str], k1: float = 1.5, b: float = 0.75
+) -> list[float]:
+    """BM25 ingênuo em loops aninhados — referência independente da implementação."""
+    import math
+    from collections import Counter
+
+    n = len(corpus)
+    if n == 0:
+        return []
+    tfs = [Counter(d) for d in corpus]
+    dl = [sum(c.values()) for c in tfs]
+    avgdl = sum(dl) / n
+    if avgdl == 0:
+        return [0.0] * n
+    df: Counter[str] = Counter(t for d in corpus for t in set(d))
+    scores = [0.0] * n
+    for q in set(query):
+        if q not in df:
+            continue
+        idf = math.log(1.0 + (n - df[q] + 0.5) / (df[q] + 0.5))
+        for i, tf in enumerate(tfs):
+            f = tf.get(q, 0)
+            if f:
+                scores[i] += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * dl[i] / avgdl))
+    return scores
+
+
+def test_bm25_vetorizado_igual_forca_bruta() -> None:
+    import random
+
+    from hybrid_rag_mcp.stores.lexic import BM25
+
+    rng = random.Random(42)
+    vocab = [f"t{i}" for i in range(60)]
+    for trial in range(5):
+        corpus = [[rng.choice(vocab) for _ in range(rng.randint(0, 40))] for _ in range(300)]
+        query = [rng.choice(vocab) for _ in range(8)]
+        model = BM25()
+        model.fit(corpus)
+        got, want = model.score_all(query), _brute_force(corpus, query)
+        assert len(got) == len(want) == 300
+        assert max(abs(g - w) for g, w in zip(got, want, strict=True)) < 1e-9
+
+
+def test_bm25_edges() -> None:
+    from hybrid_rag_mcp.stores.lexic import BM25
+
+    assert BM25().score_all(["x"]) == []
+    m = BM25()
+    m.fit([["a", "b"], ["b", "c"]])
+    assert m.score_all(["zzz"]) == [0.0, 0.0]
+    assert m.score_all([]) == [0.0, 0.0]
+    empty = BM25()
+    empty.fit([[], []])
+    assert empty.score_all(["a"]) == [0.0, 0.0]
+    assert m.score_all(["b", "b"]) == m.score_all(["b"])  # sets: repetição não pesa

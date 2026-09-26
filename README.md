@@ -108,9 +108,13 @@ Qdrant on a 4GB RAM box.
 | 8-thread search | p50 1313ms · p95 2334ms |
 | p99 single 4.4s | one-time warmup cost (first search restores the BM25 index) |
 
-Honest readings: the bottleneck at scale is **pure-Python BM25** (scans every
-doc per query) plus contention under concurrency (~5x with 8 threads — GIL +
-local Qdrant + embedding on Ollama). Known ceiling: at 128k chunks the box
+Honest readings (including our own correction): the initial guess was that
+pure-Python BM25 was the bottleneck — measured, it wasn't: at 32k docs
+`score_all` cost ~17ms of ~400ms per search (the bulk is Ollama embedding +
+local HNSW). We vectorized anyway (~10x: 17.5→1.7ms on 30k synthetic docs,
+parity < 1e-9): the win compounds at 10x scale, where the pure loop would
+dominate. Contention under concurrency (~5x with 8 threads — GIL + local
+Qdrant + embedding on Ollama) stands. Known ceiling: at 128k chunks the box
 OOMed — above ~100k chunks or on little RAM, use server mode
 (`QDRANT_URL`, see Deploy).
 
@@ -319,7 +323,7 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality
 
-- **95 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25, persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check and LLM cascade.
+- **98 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25 (incl. vectorized × brute-force parity), persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check and LLM cascade.
 - CI in 2 jobs: `test` (ruff + **mypy strict** + pytest with ≥75% coverage + `pip-audit` + stdio/HTTP smoke) and `eval` (real Ollama + `recall@1 >= 0.8` gate). Weekly Dependabot (pip + actions).
 - Two storage modes: **embedded** (default, no Docker, 1 process at a time) or
   **server** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) for

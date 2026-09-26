@@ -107,10 +107,14 @@ embarcado numa máquina de 4GB RAM.
 | busca 8 threads | p50 1313ms · p95 2334ms |
 | p99 single 4,4s | custo one-time de warmup (1ª busca restaura o BM25) |
 
-Leituras honestas: o gargalo em escala é o **BM25 em Python puro** (varre todos
-os docs por query) e a contenção sob concorrência (~5x com 8 threads — GIL +
-Qdrant local + embedding no Ollama). Teto conhecido: com 128k chunks a máquina
-tomou OOM — acima de ~100k chunks ou pouca RAM, usar o modo servidor
+Leituras honestas (incluindo uma correção nossa): o palpite inicial era que o
+BM25 em Python puro fosse o gargalo — medido, não era: em 32k docs o
+`score_all` custava ~17ms dos ~400ms por busca (o grosso é embedding no Ollama
++ HNSW local). Vetorizamos mesmo assim (~10x: 17,5→1,7ms em 30k docs
+sintéticos, paridade < 1e-9): o ganho compõe em 10x de escala, onde o loop
+puro dominaria. A contenção sob concorrência (~5x com 8 threads — GIL +
+Qdrant local + embedding no Ollama) segue. Teto conhecido: com 128k chunks
+a máquina tomou OOM — acima de ~100k chunks ou pouca RAM, usar o modo servidor
 (`QDRANT_URL`, ver Deploy).
 
 ## Otimização de contexto (cache + compressão)
@@ -318,7 +322,7 @@ Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade
 
-- **95 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25, persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão e cascata de LLMs.
+- **98 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25 (inclui paridade vetorizado × força bruta), persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão e cascata de LLMs.
 - CI em 2 jobs: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

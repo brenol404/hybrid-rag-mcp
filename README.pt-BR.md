@@ -88,6 +88,11 @@ resposta esperada, nota **0/1/2** dada pelo próprio Ollama — rode com
 | nota 1 | 1/12 (ans-06: faltou "telemetria não vai ao PostgreSQL") |
 | nota 0 / sem veredito | 0 |
 
+Compressão validada: com `CONTEXT_COMPRESSION=1` a média se mantém em 1,92;
+com `2`, **2,00** (12×2) — podar palavras-função não degrada as respostas
+(cache desligado nas 3 rodadas; n=12, diferença de 1 item está no ruído —
+a conclusão é "não piora", não "melhora").
+
 ## Escala (retrieval, modo embarcado)
 
 Metodologia (`tools/scale_bench.py`): 11 docs reais replicados com salt único

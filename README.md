@@ -89,6 +89,11 @@ answer, scored **0/1/2** by Ollama itself — run with
 | score 1 | 1/12 (ans-06: missed "telemetry doesn't go to PostgreSQL") |
 | score 0 / no verdict | 0 |
 
+Compression validated: with `CONTEXT_COMPRESSION=1` the average holds at 1.92;
+with `2`, **2.00** (12×2) — pruning function words does not degrade answers
+(cache off in all 3 runs; n=12, a 1-item swing is noise —
+the conclusion is "doesn't hurt", not "helps").
+
 ## Scale (retrieval, embedded mode)
 
 Methodology (`tools/scale_bench.py`): 11 real docs replicated with unique salt

@@ -49,7 +49,7 @@ class VectorStore:
             stored = self._stored_dim()
             if stored is not None and stored != self._dim:
                 if self._settings_qdrant_recreate():
-                    self._client.delete_collection(self.COLLECTION)
+                    self._delete_collection()
                     self._client.create_collection(
                         collection_name=self.COLLECTION,
                         vectors_config=qm.VectorParams(size=self._dim, distance=qm.Distance.COSINE),
@@ -64,6 +64,15 @@ class VectorStore:
 
     def _settings_qdrant_recreate(self) -> bool:
         return bool(self._settings.qdrant_recreate_on_dim_change)
+
+    def _delete_collection(self) -> None:
+        """Deleta a coleção liberando descritores de arquivo em modo local (compatível com Windows)."""
+        raw_client = getattr(self._client, "_client", None)
+        if raw_client is not None and hasattr(raw_client, "collections"):
+            coll = raw_client.collections.get(self.COLLECTION)
+            if coll is not None and hasattr(coll, "close"):
+                coll.close()
+        self._client.delete_collection(self.COLLECTION)
 
     def _stored_dim(self) -> int | None:
         """Dimensão gravada na coleção, ou None se indeterminável."""

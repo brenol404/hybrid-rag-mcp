@@ -23,6 +23,7 @@ Focus: index technical documents (Markdown, TXT, PDF) and answer questions with 
 - [Context optimization](#context-optimization-cache-and-compression)
 - [Corpus](#corpus)
 - [Running](#running)
+- [Visual Dashboard](#visual-web-dashboard-live-inspector)
 - [Deploy](#deploy)
 - [Observability](#observability)
 - [MCP tools](#mcp-tools)
@@ -310,6 +311,7 @@ Nothing here is mandatory — every piece has a local default and can be swapped
 ```
 src/hybrid_rag_mcp/
 ├── server.py          # MCP server (stdio + streamable HTTP, optional bearer auth)
+├── ui.py              # Visual Web Dashboard (Starlette + Tailwind CSS)
 ├── config.py          # .env configuration (pydantic-settings)
 ├── eval.py            # recall@k / nDCG@k evaluation
 ├── judge.py           # Answer evaluation via llm-as-judge (score 0/1/2)
@@ -324,7 +326,7 @@ src/hybrid_rag_mcp/
 ├── providers/
 │   ├── embed.py       # Embeddings via Ollama
 │   ├── llm.py         # FallbackLLM (cloud → Ollama)
-│   └── rerank.py      # Optional cross-encoder (graceful degradation)
+│   └── rerank.py      # Multi-provider cross-encoder (Ollama, Cohere, Custom HTTP)
 ├── optimize/
 │   ├── cache.py       # Semantic cache (JSONL + cosine + TTL)
 │   └── compress.py    # Caveman-style compressor (PT/EN)
@@ -340,7 +342,7 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality
 
-- **98 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25 (incl. vectorized × brute-force parity), persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check and LLM cascade.
+- **103 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25 (incl. vectorized × brute-force parity), persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check, LLM cascade, UI endpoints and rerank providers.
 - CI in 2 jobs: `test` (ruff + **mypy strict** + pytest with ≥75% coverage + `pip-audit` + stdio/HTTP smoke) and `eval` (real Ollama + `recall@1 >= 0.8` gate). Weekly Dependabot (pip + actions).
 - Two storage modes: **embedded** (default, no Docker, 1 process at a time) or
   **server** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) for

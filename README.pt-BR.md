@@ -23,6 +23,7 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 - [Otimização de contexto](#otimização-de-contexto-cache--compressão)
 - [Corpus](#corpus)
 - [Como rodar](#como-rodar)
+- [Dashboard Visual](#dashboard-visual-web-live-inspector)
 - [Deploy](#deploy)
 - [Observabilidade](#observabilidade)
 - [Ferramentas MCP](#ferramentas-mcp)
@@ -197,6 +198,9 @@ emite eventos de etapa e tokens da resposta em tempo real via `notifications/pro
 ```bash
 # terminal 1
 python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000
+
+# terminal 2
+python examples/client_http.py "Qual a porta padrão?"
 ```
 
 ### Dashboard Visual Web (Live Inspector)
@@ -209,10 +213,6 @@ hybrid-rag-ui --port 8501
 python -m hybrid_rag_mcp.ui --port 8501
 ```
 Acesse `http://127.0.0.1:8501` no seu navegador.
-
-# terminal 2
-python examples/client_http.py "Qual a porta padrão?"
-```
 
 **Auth no HTTP (recomendado ao expor na rede):** gere um token
 (`openssl rand -hex 32`), exporte `MCP_AUTH_TOKEN` no servidor **e** no
@@ -310,6 +310,7 @@ Nada aqui é obrigatório — cada peça tem default local e pode ser trocada se
 ```
 src/hybrid_rag_mcp/
 ├── server.py          # Servidor MCP (stdio + streamable HTTP, auth bearer opcional)
+├── ui.py              # Dashboard Visual Web (Starlette + Tailwind CSS)
 ├── config.py          # Configuração via .env (pydantic-settings)
 ├── eval.py            # Avaliação recall@k / nDCG@k
 ├── judge.py           # Avaliação de respostas via llm-as-judge (NOTA 0/1/2)
@@ -324,7 +325,7 @@ src/hybrid_rag_mcp/
 ├── providers/
 │   ├── embed.py       # Embeddings via Ollama
 │   ├── llm.py         # FallbackLLM (nuvem → Ollama)
-│   └── rerank.py      # Cross-encoder opcional (degradação graciosa)
+│   └── rerank.py      # Cross-encoder multi-provedor (Ollama, Cohere, Custom HTTP)
 ├── optimize/
 │   ├── cache.py       # Cache semântico (JSONL + cosseno + TTL)
 │   └── compress.py    # Compressor estilo-Caveman (PT/EN)
@@ -340,7 +341,7 @@ Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade
 
-- **98 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25 (inclui paridade vetorizado × força bruta), persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão e cascata de LLMs.
+- **103 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25 (inclui paridade vetorizado × força bruta), persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão, cascata de LLMs, endpoints da UI e provedores de rerank.
 - CI em 2 jobs: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

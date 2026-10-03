@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..models import SearchHit
-from ..providers.rerank import Reranker
+from ..providers.rerank import BaseReranker
 from ..stores import LexicalStore, VectorStore
 
 
@@ -47,7 +47,7 @@ def hybrid_search(
     query: str,
     top_k: int,
     bm25_top_k: int,
-    reranker: Reranker | None = None,
+    reranker: BaseReranker | None = None,
     rerank_budget: int = 20,
     rrf_k: int = 60,
     rrf_weights: tuple[float, float] = (1.0, 1.0),

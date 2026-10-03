@@ -35,7 +35,9 @@ class _FakeLLM:
 
     def complete(self, system: str, user: str) -> LLMResponse:
         self.calls += 1
-        return LLMResponse("O RAG híbrido combina vetores com BM25 [guia-rag.md].", "mock", "test-model")
+        return LLMResponse(
+            "O RAG híbrido combina vetores com BM25 [guia-rag.md].", "mock", "test-model"
+        )
 
     def complete_stream(self, system: str, user: str):
         yield self.complete(system, user)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import httpx
-
 from hybrid_rag_mcp.config import Settings
 from hybrid_rag_mcp.models import SearchHit
 from hybrid_rag_mcp.providers.rerank import (
@@ -74,9 +72,7 @@ def test_build_reranker_selection() -> None:
     assert isinstance(r_ollama, OllamaReranker)
 
     # 3. Cohere provider
-    r_cohere = build_reranker(
-        Settings(rerank_provider="cohere", cohere_api_key="cohere-key-123")
-    )
+    r_cohere = build_reranker(Settings(rerank_provider="cohere", cohere_api_key="cohere-key-123"))
     assert isinstance(r_cohere, CohereReranker)
 
     # 4. Custom provider

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
-import json
 import logging
 from typing import Any
 
@@ -483,7 +481,7 @@ class UIApp:
     async def search_endpoint(self, request: Request) -> JSONResponse:
         try:
             body = await request.json()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return JSONResponse({"error": "Corpo JSON inválido"}, status_code=400)
 
         query = body.get("query", "").strip()
@@ -517,7 +515,7 @@ class UIApp:
     async def ask_endpoint(self, request: Request) -> JSONResponse:
         try:
             body = await request.json()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return JSONResponse({"error": "Corpo JSON inválido"}, status_code=400)
 
         question = body.get("question", "").strip()
@@ -573,7 +571,7 @@ class UIApp:
     async def ingest_text_endpoint(self, request: Request) -> JSONResponse:
         try:
             body = await request.json()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return JSONResponse({"error": "Corpo JSON inválido"}, status_code=400)
 
         doc_name = body.get("doc_name", "").strip()
@@ -592,7 +590,7 @@ class UIApp:
 
         try:
             dim = self.engine._embedder.dim
-        except Exception:
+        except Exception:  # noqa: BLE001
             dim = 1024
 
         return JSONResponse(

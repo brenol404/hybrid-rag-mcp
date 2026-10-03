@@ -21,7 +21,6 @@ class BaseReranker(ABC):
 
     def close(self) -> None:
         """Libera conexões HTTP ou recursos."""
-        pass
 
 
 class OllamaReranker(BaseReranker):

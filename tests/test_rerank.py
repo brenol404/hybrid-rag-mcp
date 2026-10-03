@@ -1,10 +1,18 @@
-"""Testes do re-ranking — sem Ollama (stub + fallback puro)."""
+"""Testes do re-ranking — sem Ollama nem Cohere real (stub + fallback puro)."""
 
 from __future__ import annotations
 
+import httpx
+
 from hybrid_rag_mcp.config import Settings
 from hybrid_rag_mcp.models import SearchHit
-from hybrid_rag_mcp.providers.rerank import Reranker
+from hybrid_rag_mcp.providers.rerank import (
+    CohereReranker,
+    CustomHttpReranker,
+    OllamaReranker,
+    Reranker,
+    build_reranker,
+)
 from hybrid_rag_mcp.rag.hybrid import hybrid_search
 from hybrid_rag_mcp.stores.lexic import LexicalStore
 from hybrid_rag_mcp.stores.vector import VectorStore
@@ -35,6 +43,47 @@ def test_reranker_ignora_endpoint_indisponivel() -> None:
     r = Reranker(Settings(rerank_model="fake-model", ollama_host="http://localhost:1"))
     scores = r.score("x", ["a", "b"])
     assert scores == [0.0, 0.0]
+
+
+def test_cohere_reranker_sem_chave_retorna_zeros() -> None:
+    c = CohereReranker(Settings(cohere_api_key=""))
+    assert c.score("pergunta", ["a", "b"]) == [0.0, 0.0]
+
+
+def test_cohere_reranker_offline_retorna_zeros() -> None:
+    c = CohereReranker(
+        Settings(
+            cohere_api_key="test-key",
+            rerank_url="http://localhost:1/rerank",
+        )
+    )
+    assert c.score("pergunta", ["a", "b"]) == [0.0, 0.0]
+
+
+def test_custom_reranker_offline_retorna_zeros() -> None:
+    cr = CustomHttpReranker(Settings(rerank_url="http://localhost:1/rerank"))
+    assert cr.score("pergunta", ["a", "b"]) == [0.0, 0.0]
+
+
+def test_build_reranker_selection() -> None:
+    # 1. Sem configuração -> None
+    assert build_reranker(Settings(rerank_model="", cohere_api_key="")) is None
+
+    # 2. Ollama default
+    r_ollama = build_reranker(Settings(rerank_model="bge-reranker-v2-m3"))
+    assert isinstance(r_ollama, OllamaReranker)
+
+    # 3. Cohere provider
+    r_cohere = build_reranker(
+        Settings(rerank_provider="cohere", cohere_api_key="cohere-key-123")
+    )
+    assert isinstance(r_cohere, CohereReranker)
+
+    # 4. Custom provider
+    r_custom = build_reranker(
+        Settings(rerank_provider="custom", rerank_url="http://localhost:8000/rerank")
+    )
+    assert isinstance(r_custom, CustomHttpReranker)
 
 
 def test_hybrid_rerank_reordena_top_k() -> None:

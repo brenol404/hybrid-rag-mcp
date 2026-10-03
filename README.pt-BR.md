@@ -34,7 +34,7 @@ Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas co
 
 - **Busca híbrida**: embedding (Qdrant local, sem Docker) + BM25 próprio (idf suavizado), fundidos por **RRF**.
 - **Agente multi-step**: se o contexto da 1ª busca for insuficiente, o modelo sinaliza `[MORE_CONTEXT]`, o agente gera uma busca de follow-up e repete com **memória incremental de fontes**.
-- **Re-ranking opcional**: cross-encoder (Ollama `/api/rerank`, ex. `bge-reranker-v2-m3`) com *degradação graciosa*.
+- **Re-ranking opcional**: cross-encoder local via Ollama (`bge-reranker-v2-m3`), neural via API **Cohere** (`rerank-v3.5`) ou endpoint HTTP customizado, sempre com *degradação graciosa*.
 - **Fallback resiliente**: provedor de nuvem (OpenAI-compatible) na frente, **Ollama local como reserva** quando a API cai.
 - **Persistência**: os chunks ficam no Qdrant; o índice BM25 é **restaurado sob demanda** (primeira busca) sem re-ingestão.
 - **Ingestão incremental**: re-rodar `ingest` só embeda o que mudou (idempotente por hash de conteúdo) e poda órfãos — barato em CI e em re-deploys.

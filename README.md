@@ -34,7 +34,7 @@ Focus: index technical documents (Markdown, TXT, PDF) and answer questions with 
 
 - **Hybrid search**: embeddings (local Qdrant, no Docker) + in-house BM25 (smoothed idf), fused by **RRF**.
 - **Multi-step agent**: if the first search's context is insufficient, the model signals `[MORE_CONTEXT]`, the agent issues a follow-up search and retries with **incremental source memory**.
-- **Optional re-ranking**: cross-encoder (Ollama `/api/rerank`, e.g. `bge-reranker-v2-m3`) with *graceful degradation*.
+- **Optional re-ranking**: local cross-encoder via Ollama (`bge-reranker-v2-m3`), neural via **Cohere API** (`rerank-v3.5`), or custom HTTP endpoint, with *graceful degradation*.
 - **Resilient fallback**: cloud provider (OpenAI-compatible) first, **local Ollama as backup** when the API is down.
 - **Persistence**: chunks live in Qdrant; the BM25 index is **restored on demand** (first search) with no re-ingestion.
 - **Incremental ingestion**: re-running `ingest` only embeds what changed (content-hash idempotent) and prunes orphans — cheap in CI and redeploys.

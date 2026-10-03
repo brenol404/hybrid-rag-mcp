@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     rrf_w_vector: float = 1.0
     rrf_w_lexical: float = 1.5
     rerank_model: str = ""
+    rerank_provider: str = "ollama"  # "ollama", "cohere", "custom"
+    rerank_url: str = ""
+    cohere_api_key: str = ""
     rerank_budget: int = 20
     ask_max_iterations: int = 2
 

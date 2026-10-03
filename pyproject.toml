@@ -1,6 +1,6 @@
 [project]
 name = "hybrid-rag-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local task-oriented agent with hybrid RAG (vector + BM25) exposed via MCP, with offline fallback through Ollama."
 requires-python = ">=3.11"
 readme = "README.md"

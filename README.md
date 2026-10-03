@@ -9,7 +9,7 @@
 
 Focus: index technical documents (Markdown, TXT, PDF) and answer questions with **cited sources**, **100% locally**, without sending documents to third parties.
 
-> **Evidence:** recall@1 **0.917** · answer judge **1.92/2** · **80 tests** · mypy strict · CI with quality gates.
+> **Evidence:** recall@1 **0.917** · answer judge **1.92/2** · **103 tests** · mypy strict · CI with quality gates.
 
 **Leia em [português](README.pt-BR.md).**
 

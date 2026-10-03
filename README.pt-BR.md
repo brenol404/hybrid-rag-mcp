@@ -11,7 +11,7 @@
 
 Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas com **fontes citadas**, de forma **100% local**, sem enviar documentos para terceiros.
 
-> **Prova:** recall@1 **0.917** · juiz de respostas **1.92/2** · **80 testes** · mypy strict · CI com gates de qualidade.
+> **Prova:** recall@1 **0.917** · juiz de respostas **1.92/2** · **103 testes** · mypy strict · CI com gates de qualidade.
 
 ## Índice
 

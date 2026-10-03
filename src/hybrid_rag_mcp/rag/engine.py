@@ -9,13 +9,14 @@ from pathlib import Path
 
 from ..config import Settings, get_settings
 from ..metrics import Metrics
-from ..models import AskResult, SearchHit, TraceStep
+from ..models import AskResult, DocumentChunk, SearchHit, TraceStep
 from ..optimize import SemanticCache, resolve_compressor
 from ..providers import FallbackLLM, resolve_embedder
 from ..providers.rerank import build_reranker
 from ..stores import LexicalStore, VectorStore
 from .agent import run_agent
-from .hybrid import hybrid_search
+from .chunker import chunk_text
+from .hybrid import hybrid_search, rrf_fusion
 from .ingestion import ingest_directory
 
 
@@ -114,6 +115,53 @@ class RAGEngine:
             )
         )
         return hits
+
+    def search_detailed(
+        self,
+        query: str,
+        top_k: int | None = None,
+        weights: tuple[float, float] | None = None,
+    ) -> dict[str, list[SearchHit]]:
+        """Busca retornando os resultados parciais (vetorial, léxico) e a fusão RRF final."""
+        self._ensure_ready()
+        top_k = top_k or self._settings.top_k
+        w = weights or (self._settings.rrf_w_vector, self._settings.rrf_w_lexical)
+        vector_hits = self._vector.search(query, top_k=top_k)
+        lexical_hits = self._lexical.search(query, top_k=self._settings.bm25_top_k)
+        fused = rrf_fusion(
+            vector_hits,
+            lexical_hits,
+            k=self._settings.rrf_k,
+            weights=w,
+        )
+        return {
+            "hybrid": fused[:top_k],
+            "vector": vector_hits[:top_k],
+            "lexical": lexical_hits[:top_k],
+        }
+
+    def ingest_text(
+        self,
+        doc_name: str,
+        text: str,
+        chunk_size: int | None = None,
+        overlap: int | None = None,
+    ) -> dict[str, int]:
+        """Indexa um texto diretamente sob um nome de documento nos dois índices."""
+        self._ensure_ready()
+        chunk_size = chunk_size or self._settings.chunk_size
+        overlap = overlap or self._settings.chunk_overlap
+        chunks = chunk_text(doc_name, text, chunk_size=chunk_size, overlap=overlap)
+        if not chunks:
+            return {"chunks": 0, "indexed": len(self._vector.all_chunks())}
+        self._vector.upsert_chunks(chunks)
+        self._lexical.upsert_chunks(chunks)
+        return {"chunks": len(chunks), "indexed": len(self._vector.all_chunks())}
+
+    def all_chunks(self) -> list[DocumentChunk]:
+        """Retorna todos os chunks persistidos no índice."""
+        self._ensure_ready()
+        return self._vector.all_chunks()
 
     # ----- Geração com rastreabilidade (agente multi-step) --------------------
     def ask(

@@ -197,6 +197,18 @@ emite eventos de etapa e tokens da resposta em tempo real via `notifications/pro
 ```bash
 # terminal 1
 python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000
+```
+
+### Dashboard Visual Web (Live Inspector)
+
+Para explorar visualmente e de forma interativa a busca híbrida (comparando **RRF**, **Qdrant Vetorial** e **BM25 Léxico** lado a lado), conversar com o agente e inspecionar chunks em tempo real:
+
+```bash
+hybrid-rag-ui --port 8501
+# ou
+python -m hybrid_rag_mcp.ui --port 8501
+```
+Acesse `http://127.0.0.1:8501` no seu navegador.
 
 # terminal 2
 python examples/client_http.py "Qual a porta padrão?"

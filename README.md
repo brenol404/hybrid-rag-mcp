@@ -203,6 +203,17 @@ python -m hybrid_rag_mcp --transport http --host 127.0.0.1 --port 8000
 python examples/client_http.py "Qual a porta padrão?"
 ```
 
+### Visual Web Dashboard (Live Inspector)
+
+To interactively explore hybrid retrieval (comparing **RRF**, **Vector (Qdrant)**, and **BM25 Lexical** side-by-side), ask questions with agent trace steps, and inspect indexed chunks in real time:
+
+```bash
+hybrid-rag-ui --port 8501
+# or
+python -m hybrid_rag_mcp.ui --port 8501
+```
+Open `http://127.0.0.1:8501` in your browser.
+
 **HTTP auth (recommended when exposing on a network):** generate a token
 (`openssl rand -hex 32`), export `MCP_AUTH_TOKEN` on the server **and** the
 client — without the `Authorization: Bearer` header the server answers 401.

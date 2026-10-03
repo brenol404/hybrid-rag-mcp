@@ -34,10 +34,11 @@ def chunk_text(
 
 
 def _split_sections(text: str) -> list[str]:
-    """Quebra o texto em seções por linhas de cabeçalho (#, ~~~, 'Termo:' etc.)."""
+    """Quebra o texto em seções por linhas de cabeçalho (#, ~~~, etc.), preservando blocos de código."""
     lines = text.splitlines()
     sections: list[str] = []
     current: list[str] = []
+    in_code_block = False
 
     def flush() -> None:
         if current:
@@ -45,17 +46,37 @@ def _split_sections(text: str) -> list[str]:
             current.clear()
 
     for line in lines:
-        if re.match(r"^#{1,6}\s", line) or re.match(r"^={3,}|^-{3,}$", line.strip()):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+
+        if not in_code_block and (
+            re.match(r"^#{1,6}\s", line) or re.match(r"^={3,}|^-{3,}$", stripped)
+        ):
             flush()
         current.append(line)
-        if re.match(r"^={3,}|^-{3,}$", line.strip()):
+        if not in_code_block and re.match(r"^={3,}|^-{3,}$", stripped):
             flush()
     flush()
     return [s for s in sections if s.strip()]
 
 
 def _sentences(section: str) -> list[str]:
-    return [s.strip() for s in _SENTENCE_SPLIT.split(section) if s.strip()]
+    """Divide em sentenças preservando blocos de código markdown intactos."""
+    if "```" not in section:
+        return [s.strip() for s in _SENTENCE_SPLIT.split(section) if s.strip()]
+
+    parts = section.split("```")
+    result: list[str] = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            code = "```" + part + "```"
+            if code.strip():
+                result.append(code.strip())
+        else:
+            sents = [s.strip() for s in _SENTENCE_SPLIT.split(part) if s.strip()]
+            result.extend(sents)
+    return result
 
 
 def _tail(text: str, overlap: int) -> str:

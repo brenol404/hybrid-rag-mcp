@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0] — 2026-10-03
+
+### Ingestão & Processamento Universal de Documentos
+
+- **Formatos Expandidos**: Suporte nativo a documentos Word (`.docx`), planilhas e dados tabulares (`.csv`, `.tsv`), páginas web (`.html`, `.htm`) e estruturas de dados (`.json`, `.jsonl`) sem introduzir dependências externas pesadas (usando biblioteca padrão do Python).
+- **Chunking Consciente de Código**: Preservação inteligente de blocos de código markdown (` ``` `) e tabelas, impedindo a fragmentação indesejada por pontuação de sentenças (`.`, `!`, `?`).
+
+### Empacotamento & Distribuição
+
+- **Publicação Automática no PyPI**: Configurado pipeline de CI no GitHub Actions (`.github/workflows/publish.yml`) via PyPI Trusted Publishing para tags de release.
+- **Metadados Completos**: Adicionados autores, URLs, palavras-chave e classificadores SPDX oficiais ao `pyproject.toml`.
+
+### Qualidade
+
+- Suíte de testes expandida para **110 testes unitários** com 83.2% de cobertura de código, `mypy strict` e `ruff format` 100% validados.
+
 ## [0.2.0] — 2026-10-02
 
 ### Interface & Usabilidade

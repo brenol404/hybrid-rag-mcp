@@ -1,11 +1,33 @@
 [project]
 name = "hybrid-rag-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local task-oriented agent with hybrid RAG (vector + BM25) exposed via MCP, with offline fallback through Ollama."
 requires-python = ">=3.11"
 readme = "README.md"
-license = { text = "MIT" }
-authors = [{ name = "lima" }]
+authors = [
+    { name = "Breno Lima", email = "pqpbrenol@gmail.com" },
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "rag",
+    "hybrid-search",
+    "bm25",
+    "qdrant",
+    "ollama",
+    "cohere",
+    "llm",
+    "local-first",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
 dependencies = [
     "mcp>=1.4",
     "qdrant-client>=1.12",
@@ -16,6 +38,13 @@ dependencies = [
     "pypdf>=5.0",
     "numpy>=1.26",
 ]
+
+[project.urls]
+Homepage = "https://github.com/brenol404/hybrid-rag-mcp"
+Documentation = "https://github.com/brenol404/hybrid-rag-mcp#readme"
+Repository = "https://github.com/brenol404/hybrid-rag-mcp.git"
+Issues = "https://github.com/brenol404/hybrid-rag-mcp/issues"
+Changelog = "https://github.com/brenol404/hybrid-rag-mcp/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

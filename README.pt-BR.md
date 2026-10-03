@@ -9,9 +9,9 @@
 
 > Serve MCP com **RAG híbrido** (Qdrant vetorial + BM25 léxico via RRF), **agente multi-step** com fallback offline via **Ollama** e transporte **stdio** ou **streamable HTTP**.
 
-Foco: indexar documentos técnicos (Markdown, TXT, PDF) e responder perguntas com **fontes citadas**, de forma **100% local**, sem enviar documentos para terceiros.
+Foco: indexar documentos técnicos e operacionais (Markdown, TXT, PDF, Word DOCX, CSV/TSV, HTML e JSON) e responder perguntas com **fontes citadas**, de forma **100% local**, sem enviar documentos para terceiros.
 
-> **Prova:** recall@1 **0.917** · juiz de respostas **1.92/2** · **103 testes** · mypy strict · CI com gates de qualidade.
+> **Prova:** recall@1 **0.917** · juiz de respostas **1.92/2** · **110 testes** · mypy strict · CI com gates de qualidade.
 
 ## Índice
 
@@ -341,7 +341,7 @@ Histórico de releases: [CHANGELOG.md](CHANGELOG.md).
 
 ## Qualidade
 
-- **103 testes unitários** (`pytest`) sem rede/Ollama — chunking, RRF, BM25 (inclui paridade vetorizado × força bruta), persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão, cascata de LLMs, endpoints da UI e provedores de rerank.
+- **110 testes unitários** (`pytest`) sem rede/Ollama — chunking consciente de blocos de código, RRF, BM25 (inclui paridade vetorizado × força bruta), persistência, métricas de eval, loop do agente, cache semântico, compressor, thread-safety do índice léxico, parsing/agregação do juiz, auth HTTP, rotação do audit, observabilidade, compressor plugável, embeddings na nuvem, checagem de dimensão, cascata de LLMs, endpoints da UI, provedores de rerank e ingestão de documentos (.md, .txt, .pdf, .docx, .csv, .tsv, .html, .json).
 - CI em 2 jobs: `test` (ruff + **mypy strict** + pytest com cobertura ≥75% + `pip-audit` + smoke stdio/HTTP) e `eval` (Ollama real + gate `recall@1 >= 0.8`). Dependabot semanal (pip + actions).
 - Dois modos de storage: **embarcado** (default, sem Docker, 1 processo por vez) ou
   **servidor** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) para

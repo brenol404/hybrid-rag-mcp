@@ -7,9 +7,9 @@
 
 > MCP server with **hybrid RAG** (vector Qdrant + lexical BM25 via RRF), a **multi-step agent** with offline fallback via **Ollama**, and **stdio** or **streamable HTTP** transport.
 
-Focus: index technical documents (Markdown, TXT, PDF) and answer questions with **cited sources**, **100% locally**, without sending documents to third parties.
+Focus: index technical and operational documents (Markdown, TXT, PDF, Word DOCX, CSV/TSV tables, HTML and JSON) and answer questions with **cited sources**, **100% locally**, without sending documents to third parties.
 
-> **Evidence:** recall@1 **0.917** · answer judge **1.92/2** · **103 tests** · mypy strict · CI with quality gates.
+> **Evidence:** recall@1 **0.917** · answer judge **1.92/2** · **110 tests** · mypy strict · CI with quality gates.
 
 **Leia em [português](README.pt-BR.md).**
 
@@ -342,7 +342,7 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Quality
 
-- **103 unit tests** (`pytest`) with no network/Ollama — chunking, RRF, BM25 (incl. vectorized × brute-force parity), persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check, LLM cascade, UI endpoints and rerank providers.
+- **110 unit tests** (`pytest`) with no network/Ollama — code-block-aware chunking, RRF, BM25 (incl. vectorized × brute-force parity), persistence, eval metrics, agent loop, semantic cache, compressor, lexical-index thread-safety, judge parsing/aggregation, HTTP auth, audit rotation, observability, pluggable compressor, cloud embeddings, dimension check, LLM cascade, UI endpoints, rerank providers and multi-format document ingestion (.md, .txt, .pdf, .docx, .csv, .tsv, .html, .json).
 - CI in 2 jobs: `test` (ruff + **mypy strict** + pytest with ≥75% coverage + `pip-audit` + stdio/HTTP smoke) and `eval` (real Ollama + `recall@1 >= 0.8` gate). Weekly Dependabot (pip + actions).
 - Two storage modes: **embedded** (default, no Docker, 1 process at a time) or
   **server** (`docker compose up -d` + `QDRANT_URL=http://localhost:6333`) for

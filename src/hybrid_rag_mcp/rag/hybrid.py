@@ -60,18 +60,19 @@ def hybrid_search(
         budget = fused[:rerank_budget]
         texts = [h.content for h in budget]
         scores = reranker.score(query, texts)
-        budget = [
-            SearchHit(
-                chunk_id=h.chunk_id,
-                doc_name=h.doc_name,
-                content=h.content,
-                score=float(score),
-                strategy="hybrid",
-            )
-            for h, score in sorted(
-                zip(budget, scores, strict=True), key=lambda t: t[1], reverse=True
-            )
-        ]
-        return budget[:top_k]
+        if any(s != 0.0 for s in scores):
+            budget = [
+                SearchHit(
+                    chunk_id=h.chunk_id,
+                    doc_name=h.doc_name,
+                    content=h.content,
+                    score=float(score),
+                    strategy="hybrid",
+                )
+                for h, score in sorted(
+                    zip(budget, scores, strict=True), key=lambda t: t[1], reverse=True
+                )
+            ]
+            return budget[:top_k]
 
     return fused[:top_k]

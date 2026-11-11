@@ -288,7 +288,7 @@ contadores (`search_total`, `ask_total`, `ask_cache_hits`, `*_errors`,
 
 | Tool    | Descrição |
 |---------|-----------|
-| `ingest` | Indexa `md`/`txt`/`pdf` de um diretório nos dois índices (Qdrant + BM25). Incremental: só re-embeda chunks alterados. |
+| `ingest` | Indexa documentos suportados (`md`, `txt`, `pdf`, `docx`, `csv`, `tsv`, `html`, `json`, `jsonl`) de um diretório nos dois índices (Qdrant + BM25). Incremental: só re-embeda chunks alterados. |
 | `search` | Busca híbrida (RRF, com re-ranking opcional) retornando trechos + fontes. |
 | `ask`    | Agente multi-step: recupera, gera, detecta contexto insuficiente, refaz a busca e responde citando fontes (com audit log). Consulta o **cache semântico** antes de gerar. |
 | `metrics` | Resumo das métricas do servidor (contadores + latências p50/p95 desde o boot). |
@@ -321,7 +321,7 @@ src/hybrid_rag_mcp/
 │   ├── chunker.py     # Chunking por seções markdown + sentenças
 │   ├── engine.py      # Orquestração: ingest → search → ask + audit
 │   ├── hybrid.py      # Fusão RRF + re-ranking
-│   └── ingestion.py   # Leitura de md/txt/pdf
+│   └── ingestion.py   # Leitura multi-formato (md, txt, pdf, docx, csv/tsv, html, json)
 ├── providers/
 │   ├── embed.py       # Embeddings via Ollama
 │   ├── llm.py         # FallbackLLM (nuvem → Ollama)

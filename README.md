@@ -289,7 +289,7 @@ counters (`search_total`, `ask_total`, `ask_cache_hits`, `*_errors`,
 
 | Tool    | Description |
 |---------|-----------|
-| `ingest` | Indexes `md`/`txt`/`pdf` from a directory into both indexes (Qdrant + BM25). Incremental: only re-embeds changed chunks. |
+| `ingest` | Indexes supported documents (`md`, `txt`, `pdf`, `docx`, `csv`, `tsv`, `html`, `json`, `jsonl`) from a directory into both indexes (Qdrant + BM25). Incremental: only re-embeds changed chunks. |
 | `search` | Hybrid search (RRF, optional re-ranking) returning snippets + sources. |
 | `ask`    | Multi-step agent: retrieves, generates, detects insufficient context, re-searches and answers citing sources (with audit log). Consults the **semantic cache** before generating. |
 | `metrics` | Server metrics summary (counters + p50/p95 latencies since boot). |
@@ -322,7 +322,7 @@ src/hybrid_rag_mcp/
 │   ├── chunker.py     # Chunking by markdown sections + sentences
 │   ├── engine.py      # Orchestration: ingest → search → ask + audit
 │   ├── hybrid.py      # RRF fusion + re-ranking
-│   └── ingestion.py   # md/txt/pdf reading
+│   └── ingestion.py   # Multi-format reading (md, txt, pdf, docx, csv/tsv, html, json)
 ├── providers/
 │   ├── embed.py       # Embeddings via Ollama
 │   ├── llm.py         # FallbackLLM (cloud → Ollama)

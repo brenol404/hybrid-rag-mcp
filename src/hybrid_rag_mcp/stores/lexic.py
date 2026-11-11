@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from dataclasses import dataclass
 
@@ -8,6 +9,8 @@ import numpy as np
 import numpy.typing as npt
 
 from ..models import DocumentChunk, SearchHit
+
+_TOKEN_RE = re.compile(r"\w+(?:[-=/]\w+)*", re.UNICODE)
 
 _STOPWORDS = {
     "a",
@@ -178,5 +181,4 @@ class LexicalStore:
 
 
 def _tokenize(text: str) -> list[str]:
-    words = (t.strip().lower() for t in text.replace(".", " ").replace(",", " ").split())
-    return [w for w in words if w and w not in _STOPWORDS]
+    return [w for w in _TOKEN_RE.findall(text.lower()) if w not in _STOPWORDS]

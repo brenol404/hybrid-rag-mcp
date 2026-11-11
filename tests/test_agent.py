@@ -103,3 +103,31 @@ def test_agente_streama_tokens_quando_provider_streama() -> None:
     assert result.answer == "Olá, mundo [a]."
     assert "".join(tokens) == result.answer
     assert result.provider == "ollama" and result.model == "qwen3"
+
+
+def test_agente_nao_streama_tag_more_context_ao_cliente() -> None:
+    tokens: list[str] = []
+    calls = 0
+
+    def stream(system, user):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            for part in ("[MORE_", "CONTEXT] ", "qual a janela?"):
+                yield LLMResponse(part, "ollama", "qwen3")
+        else:
+            for part in ("A janela ", "é 02h-04h [b]."):
+                yield LLMResponse(part, "ollama", "qwen3")
+
+    result = run_agent(
+        "pergunta inicial",
+        retrieve=lambda q, k: _hits("b") if "janela" in q else _hits("a"),
+        generate=lambda system, user: LLMResponse("não usado", "ollama", "qwen3"),
+        max_iterations=2,
+        on_tokens=tokens.append,
+        generate_stream=stream,
+    )
+    assert result.iterations == 2
+    assert result.answer == "A janela é 02h-04h [b]."
+    assert "".join(tokens) == "A janela é 02h-04h [b]."
+    assert "[MORE_CONTEXT]" not in "".join(tokens)

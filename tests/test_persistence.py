@@ -277,3 +277,16 @@ def test_dim_mudou_com_recreate_recomeca_vazio(tmp_path: Path) -> None:
     staying = {c.chunk_id for c in v8.all_chunks()}
     assert staying == {"c2"}  # coleção recriada: c1 sumiu, re-ingest em seguida
     v8.close()
+
+
+def test_vector_store_lock_concorrente_mensagem_amigavel(tmp_path: Path, monkeypatch) -> None:
+    import pytest
+
+    def _locked_client(*args, **kwargs):
+        raise RuntimeError(
+            "Storage folder data/qdrant is already accessed by another instance of Qdrant client."
+        )
+
+    monkeypatch.setattr("qdrant_client.QdrantClient", _locked_client)
+    with pytest.raises(RuntimeError, match="QDRANT_URL"):
+        VectorStore(Settings(qdrant_path=str(tmp_path / "qdrant")), StubEmbedder())

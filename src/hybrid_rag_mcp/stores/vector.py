@@ -28,7 +28,17 @@ class VectorStore:
             # Modo embarcado (default): sem Docker, um processo por vez.
             path = Path(settings.qdrant_path)
             path.mkdir(parents=True, exist_ok=True)
-            self._client = qdrant_client.QdrantClient(path=str(path))
+            try:
+                self._client = qdrant_client.QdrantClient(path=str(path))
+            except Exception as exc:
+                if "already accessed" in str(exc).lower() or isinstance(exc, BlockingIOError):
+                    raise RuntimeError(
+                        f"O índice local do Qdrant em '{path}' já está em uso por outro processo "
+                        "(ex.: servidor MCP e Dashboard UI rodando simultaneamente). "
+                        "Para múltiplos processos simultâneos, suba o Qdrant em modo servidor "
+                        "(docker compose up -d) e defina QDRANT_URL=http://localhost:6333."
+                    ) from exc
+                raise
         self._embedder = embedder
         # Nada consulta o embedder (nem o Ollama) aqui: a coleção e a dim só são
         # resolvidas no 1º uso (search/ingest). Construir o engine é barato.

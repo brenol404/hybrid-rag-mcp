@@ -94,3 +94,18 @@ def test_hybrid_rerank_reordena_top_k() -> None:
     )
     assert [h.chunk_id for h in reranked] == ["b", "a"]
     assert all(h.strategy == "hybrid" for h in reranked)
+
+
+def test_hybrid_rerank_preserva_scores_rrf_em_degradacao() -> None:
+    offline = Reranker(Settings(rerank_model="fake-model", ollama_host="http://localhost:1"))
+    hits = hybrid_search(
+        _StubVector(),
+        LexicalStore(),
+        "pergunta",
+        top_k=2,
+        bm25_top_k=1,
+        reranker=offline,
+        rerank_budget=2,
+    )
+    assert [h.chunk_id for h in hits] == ["a", "b"]
+    assert all(h.score > 0.0 for h in hits)

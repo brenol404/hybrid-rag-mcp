@@ -58,7 +58,7 @@ class _Runtime:
 
 @mcp.tool()
 def ingest(corpus_dir: str = "") -> str:
-    """Indexa documentos (md/txt/pdf) de um diretório nos índices vetorial e BM25."""
+    """Indexa documentos suportados (md, txt, pdf, docx, csv, tsv, html, json, jsonl) nos índices vetorial e BM25."""
     engine = _ensure_engine()
     directory = _resolve_corpus_dir(corpus_dir, get_settings().corpus_dir)
     stats = engine.ingest(directory)

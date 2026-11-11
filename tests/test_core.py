@@ -168,3 +168,15 @@ def test_bm25_edges() -> None:
     empty.fit([[], []])
     assert empty.score_all(["a"]) == [0.0, 0.0]
     assert m.score_all(["b", "b"]) == m.score_all(["b"])  # sets: repetição não pesa
+
+
+def test_lexical_tokenize_strips_punctuation_and_keeps_tech_tokens() -> None:
+    from hybrid_rag_mcp.stores.lexic import _tokenize
+
+    tokens = _tokenize("## Configuração (porta: 8443)? Garantia acks=all e exactly-once!")
+    assert "configuração" in tokens
+    assert "porta" in tokens
+    assert "8443" in tokens
+    assert "acks=all" in tokens
+    assert "exactly-once" in tokens
+    assert all(not t.endswith(("?", "!", ":", ")")) for t in tokens)

@@ -25,6 +25,7 @@ SYSTEM_PROMPT = (
 
 
 _MORE_CONTEXT = re.compile(r"^\s*\[MORE_CONTEXT\]\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+_MORE_CONTEXT_TAG = "[more_context]"
 
 RetrieveFn = Callable[[str, int], list[SearchHit]]
 GenerateFn = Callable[[str, str], LLMResponse]
@@ -100,11 +101,33 @@ def run_agent(
         emit(f"iteração {iteration}: gerando resposta…")
         if on_tokens is not None and generate_stream is not None:
             pieces: list[str] = []
+            pending: list[str] = []
+            decided = False
+            suppress_stream = False
             for chunk in generate_stream(SYSTEM_PROMPT, prompt):
                 last_provider, last_model = chunk.provider, chunk.model
                 pieces.append(chunk.text)
-                on_tokens(chunk.text)
-            resp = LLMResponse(text="".join(pieces), provider=last_provider, model=last_model)
+                if not decided:
+                    pending.append(chunk.text)
+                    probe = "".join(pending).lstrip().lower()
+                    if not probe:
+                        continue
+                    if probe.startswith(_MORE_CONTEXT_TAG):
+                        decided = True
+                        suppress_stream = True
+                        pending.clear()
+                    elif not _MORE_CONTEXT_TAG.startswith(probe):
+                        decided = True
+                        for item in pending:
+                            on_tokens(item)
+                        pending.clear()
+                elif not suppress_stream:
+                    on_tokens(chunk.text)
+            full_text = "".join(pieces)
+            if pending and extract_follow_up(full_text) is None:
+                for item in pending:
+                    on_tokens(item)
+            resp = LLMResponse(text=full_text, provider=last_provider, model=last_model)
         else:
             resp = generate(SYSTEM_PROMPT, prompt)
             last_provider, last_model = resp.provider, resp.model
